@@ -1,0 +1,7 @@
+cmd/webpush/webpush
+
+# gvt vendor
+vendor/**
+!vendor/manifest
+
+.DS_Store

@@ -1,0 +1,22 @@
+{
+	"version": 0,
+	"dependencies": [
+		{
+			"importpath": "github.com/dgrijalva/jwt-go",
+			"repository": "https://github.com/dgrijalva/jwt-go",
+			"vcs": "git",
+			"revision": "9ed569b5d1ac936e6494082958d63a6aa4fff99a",
+			"branch": "master",
+			"notests": true
+		},
+		{
+			"importpath": "golang.org/x/crypto/hkdf",
+			"repository": "https://go.googlesource.com/crypto",
+			"vcs": "git",
+			"revision": "f6b343c37ca80bfa8ea539da67a0b621f84fab1d",
+			"branch": "master",
+			"path": "/hkdf",
+			"notests": true
+		}
+	]
+}
