@@ -22,16 +22,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Subscription info
-	log.Println(s.Endpoint)
-	log.Println(s.Keys.Auth)
-	log.Println(s.Keys.P256dh)
-
 	// Send Notification
-	resp, err := webpush.SendNotification(&s, []byte("Test"), &webpush.Options{
+	resp, err := webpush.SendNotification([]byte("Test"), &s, &webpush.Options{
 		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
 		TTL:             60,
-		VapidPrivateKey: vapidPrivateKey,
+		VAPIDPrivateKey: vapidPrivateKey,
 	})
 	if err != nil {
 		log.Fatal(err)

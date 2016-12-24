@@ -14,7 +14,7 @@ import (
 )
 
 // Sign the http.Request with the required VAPID headers
-func vapid(s *Subscription, req *http.Request, options *Options) error {
+func vapid(req *http.Request, s *Subscription, options *Options) error {
 	// Create the JWT token
 	subURL, err := url.Parse(s.Endpoint)
 	if err != nil {
@@ -27,19 +27,31 @@ func vapid(s *Subscription, req *http.Request, options *Options) error {
 		"sub": options.Subscriber,
 	})
 
-	// ecdsa key
+	// ECDSA
 	b64 := base64.RawURLEncoding
-	signVapidPrivateKey, err := b64.DecodeString(options.VapidPrivateKey)
+	signVapidPrivateKey, err := b64.DecodeString(options.VAPIDPrivateKey)
 	if err != nil {
 		return err
 	}
 
+	// Public key
 	curve := elliptic.P256()
 	px, py := curve.ScalarMult(curve.Params().Gx, curve.Params().Gy, signVapidPrivateKey)
-	pubKey := ecdsa.PublicKey{Curve: curve, X: px, Y: py}
+
+	pubKey := ecdsa.PublicKey{
+		Curve: curve,
+		X:     px,
+		Y:     py,
+	}
+
+	// Private key
 	d := &big.Int{}
 	d.SetBytes(signVapidPrivateKey)
-	privKey := ecdsa.PrivateKey{PublicKey: pubKey, D: d}
+
+	privKey := ecdsa.PrivateKey{
+		PublicKey: pubKey,
+		D:         d,
+	}
 
 	// Sign token with key
 	tokenString, err := token.SignedString(&privKey)

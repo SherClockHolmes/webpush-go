@@ -19,25 +19,44 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
+var saltFunc = func() ([]byte, error) {
+	salt := make([]byte, 16)
+	_, err := io.ReadFull(rand.Reader, salt)
+	if err != nil {
+		return salt, err
+	}
+
+	return salt, nil
+}
+
+// HTTPClient is an exposed interface to pass in custom http.Client
+type HTTPClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
 // Options are config and extra params needed to send a notification
 type Options struct {
-	Subscriber      string // Sub in VAPID JWT token
-	TTL             int
-	VapidPrivateKey string // Used to sign VAPID JWT token
+	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
+	Subscriber      string     // Sub in VAPID JWT token
+	TTL             int        // Set the TTL on the endpoint POST request
+	VAPIDPrivateKey string     // Used to sign VAPID JWT token
+}
+
+// Keys are the base64 encoded values from PushSubscription.getKey()
+type Keys struct {
+	Auth   string `json:"auth"`
+	P256dh string `json:"p256dh"`
 }
 
 // Subscription represents a PushSubscription object from the Push API
 type Subscription struct {
 	Endpoint string `json:"endpoint"`
-	Keys     struct {
-		P256dh string `json:"p256dh"`
-		Auth   string `json:"auth"`
-	} `json:"keys"`
+	Keys     Keys   `json:"keys"`
 }
 
 // SendNotification sends a push notification to a subscriptions endpoint
 // Follows the Message Encryption for Web Push, and VAPID protocols
-func SendNotification(s *Subscription, message []byte, options *Options) (*http.Response, error) {
+func SendNotification(message []byte, s *Subscription, options *Options) (*http.Response, error) {
 	// Decode auth and p256
 	b64 := base64.RawURLEncoding
 
@@ -53,8 +72,7 @@ func SendNotification(s *Subscription, message []byte, options *Options) (*http.
 	}
 
 	// Generate 16 byte salt
-	salt := make([]byte, 16)
-	_, err = io.ReadFull(rand.Reader, salt)
+	salt, err := saltFunc()
 	if err != nil {
 		return &http.Response{}, err
 	}
@@ -125,13 +143,10 @@ func SendNotification(s *Subscription, message []byte, options *Options) (*http.
 	ciphertext := gcm.Seal([]byte{}, nonce, plaintext, nil)
 
 	// POST request
-	req, err := http.NewRequest("POST", s.Endpoint, nil)
+	req, err := http.NewRequest("POST", s.Endpoint, ioutil.NopCloser(bytes.NewReader(ciphertext)))
 	if err != nil {
 		return &http.Response{}, err
 	}
-
-	req.Body = ioutil.NopCloser(bytes.NewReader(ciphertext))
-	req.ContentLength = int64(len(ciphertext))
 
 	req.Header.Set("Encryption", fmt.Sprintf("salt=%s", base64.RawURLEncoding.EncodeToString(salt)))
 	req.Header.Set("Crypto-Key", fmt.Sprintf("dh=%s", base64.RawURLEncoding.EncodeToString(publicKey)))
@@ -139,13 +154,19 @@ func SendNotification(s *Subscription, message []byte, options *Options) (*http.
 	req.Header.Set("TTL", strconv.Itoa(options.TTL))
 
 	// Set VAPID headers
-	err = vapid(s, req, options)
+	err = vapid(req, s, options)
 	if err != nil {
 		return &http.Response{}, err
 	}
 
 	// Send the request
-	client := &http.Client{}
+	var client HTTPClient
+	if options.HTTPClient != nil {
+		client = options.HTTPClient
+	} else {
+		client = &http.Client{}
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return resp, err

@@ -5,3 +5,4 @@ vendor/**
 !vendor/manifest
 
 .DS_Store
+*.out

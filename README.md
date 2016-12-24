@@ -35,10 +35,10 @@ func main() {
 	}
 
 	// Send Notification
-	_, err = webpush.SendNotification(&s, []byte("Test"), &webpush.Options{
+	_, err = webpush.SendNotification([]byte("Test"), &s, &webpush.Options{
 		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
 		TTL:             60,
-		VapidPrivateKey: vapidPrivateKey,
+		VAPIDPrivateKey: vapidPrivateKey,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -51,7 +51,7 @@ func main() {
 - [Push Encryption (Go)](https://github.com/GoogleChrome/push-encryption-go)  
 - [go-ecdh](https://github.com/wsddn/go-ecdh)  
 - [WebPush Libs](https://github.com/web-push-libs)  
-- [WebPush Test Page](https://jrconlin.github.io/WebPushDataTestPage/)
+- [Web Push: Data Encryption Test Page](https://jrconlin.github.io/WebPushDataTestPage/)
 
 
 ### References
