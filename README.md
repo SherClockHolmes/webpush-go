@@ -2,11 +2,9 @@
 
 Web Push API Encryption with VAPID support.
 
-## Dependencies
-
-1. Install [Go 1.7](https://golang.org/) ([gvm](https://github.com/moovweb/gvm) recommended)
-2. Get [gvt](https://github.com/FiloSottile/gvt) `go get -u github.com/FiloSottile/gvt`
-3. `gvt restore`
+```bash
+go get -u github.com/SherClockHolmes/webpush-go
+```
 
 ## Example
 
@@ -45,6 +43,12 @@ func main() {
 	}
 }
 ```
+
+### Dependencies
+
+1. Install [Go 1.7](https://golang.org/) ([gvm](https://github.com/moovweb/gvm) recommended)
+2. Get [gvt](https://github.com/FiloSottile/gvt) `go get -u github.com/FiloSottile/gvt`
+3. `gvt restore`
 
 ### Similar Projects / Inspired By
 
