@@ -13,6 +13,32 @@ import (
 	jwt "github.com/dgrijalva/jwt-go"
 )
 
+// Generates the ECDSA public and private keys for the JWT encryption
+func generateVAPIDHeaderKeys(privateKey []byte) (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
+	// Public key
+	curve := elliptic.P256()
+	px, py := curve.ScalarMult(
+		curve.Params().Gx,
+		curve.Params().Gy,
+		privateKey,
+	)
+
+	pubKey := ecdsa.PublicKey{
+		Curve: curve,
+		X:     px,
+		Y:     py,
+	}
+
+	// Private key
+	d := &big.Int{}
+	d.SetBytes(privateKey)
+
+	return &pubKey, &ecdsa.PrivateKey{
+		PublicKey: pubKey,
+		D:         d,
+	}
+}
+
 // Sign the http.Request with the required VAPID headers
 func vapid(req *http.Request, s *Subscription, options *Options) error {
 	// Create the JWT token
@@ -29,32 +55,15 @@ func vapid(req *http.Request, s *Subscription, options *Options) error {
 
 	// ECDSA
 	b64 := base64.RawURLEncoding
-	signVapidPrivateKey, err := b64.DecodeString(options.VAPIDPrivateKey)
+	decodedVapidPrivateKey, err := b64.DecodeString(options.VAPIDPrivateKey)
 	if err != nil {
 		return err
 	}
 
-	// Public key
-	curve := elliptic.P256()
-	px, py := curve.ScalarMult(curve.Params().Gx, curve.Params().Gy, signVapidPrivateKey)
-
-	pubKey := ecdsa.PublicKey{
-		Curve: curve,
-		X:     px,
-		Y:     py,
-	}
-
-	// Private key
-	d := &big.Int{}
-	d.SetBytes(signVapidPrivateKey)
-
-	privKey := ecdsa.PrivateKey{
-		PublicKey: pubKey,
-		D:         d,
-	}
+	pubKey, privKey := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
 
 	// Sign token with key
-	tokenString, err := token.SignedString(&privKey)
+	tokenString, err := token.SignedString(privKey)
 	if err != nil {
 		return err
 	}
