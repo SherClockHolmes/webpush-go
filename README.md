@@ -47,23 +47,33 @@ func main() {
 }
 ```
 
-### Dependencies
+### Generating VAPID Keys
 
-1. Install [Go 1.7](https://golang.org/) ([gvm](https://github.com/moovweb/gvm) recommended)
+Use the helper method `GenerateVAPIDKeys` to generate the VAPID key pair.
+
+```golang
+privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+if err != nil {
+    // TODO: Handle failure!
+}
+```
+
+## Dependencies
+
+1. Install [Go 1.8+](https://golang.org/) ([gvm](https://github.com/moovweb/gvm) recommended)
 2. Get [gvt](https://github.com/FiloSottile/gvt) `go get -u github.com/FiloSottile/gvt`
 3. `gvt restore`
 
-### Similar Projects / Inspired By
-
-- [Push Encryption (Go)](https://github.com/GoogleChrome/push-encryption-go)  
-- [go-ecdh](https://github.com/wsddn/go-ecdh)  
-- [WebPush Libs](https://github.com/web-push-libs)  
-- [Web Push: Data Encryption Test Page](https://jrconlin.github.io/WebPushDataTestPage/)
-
-
-### References
+## References
 
 For more information visit these [Google Developers](https://developers.google.com/web) links:
 
 [https://developers.google.com/web/updates/2016/03/web-push-encryption](https://developers.google.com/web/updates/2016/03/web-push-encryption)  
 [https://developers.google.com/web/updates/2016/07/web-push-interop-wins](https://developers.google.com/web/updates/2016/03/web-push-encryption)
+
+### Similar Projects / Inspired By
+
+- [Push Encryption (Go)](https://github.com/GoogleChrome/push-encryption-go)
+- [go-ecdh](https://github.com/wsddn/go-ecdh)
+- [WebPush Libs](https://github.com/web-push-libs)
+- [Web Push: Data Encryption Test Page](https://jrconlin.github.io/WebPushDataTestPage/)

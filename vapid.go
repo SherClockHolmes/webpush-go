@@ -3,6 +3,7 @@ package webpush
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"math/big"
@@ -12,6 +13,25 @@ import (
 
 	jwt "github.com/dgrijalva/jwt-go"
 )
+
+// GenerateVAPIDKeys will create a private and public VAPID key pair
+func GenerateVAPIDKeys() (privateKey, publicKey string, err error) {
+	// Get the private key from the P256 curve
+	curve := elliptic.P256()
+
+	private, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		return
+	}
+
+	public := elliptic.Marshal(curve, x, y)
+
+	// Convert to base64
+	publicKey = base64.RawURLEncoding.EncodeToString(public)
+	privateKey = base64.RawURLEncoding.EncodeToString(private)
+
+	return
+}
 
 // Generates the ECDSA public and private keys for the JWT encryption
 func generateVAPIDHeaderKeys(privateKey []byte) (*ecdsa.PublicKey, *ecdsa.PrivateKey) {
