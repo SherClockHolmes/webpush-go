@@ -58,7 +58,7 @@ type Subscription struct {
 // Follows the Message Encryption for Web Push, and VAPID protocols
 func SendNotification(message []byte, s *Subscription, options *Options) (*http.Response, error) {
 	// Decode auth and p256
-	b64 := base64.RawURLEncoding
+	b64 := base64.StdEncoding.WithPadding(base64.NoPadding)
 
 	// Chrome bug appends "=" to the end
 	clientAuthSecret, err := b64.DecodeString(strings.TrimRight(s.Keys.Auth, "="))
