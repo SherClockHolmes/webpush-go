@@ -70,7 +70,7 @@ func vapid(req *http.Request, s *Subscription, options *Options) error {
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"aud": fmt.Sprintf("%s://%s", subURL.Scheme, subURL.Host),
 		"exp": time.Now().Add(time.Hour * 12).Unix(),
-		"sub": options.Subscriber,
+		"sub": fmt.Sprintf("mailto:%s", options.Subscriber),
 	})
 
 	// ECDSA

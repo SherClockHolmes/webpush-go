@@ -2,6 +2,7 @@ package webpush
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -14,7 +15,7 @@ func TestVAPID(t *testing.T) {
 	assert := assert.New(t)
 
 	s := getTestSubscription()
-	sub := "mailto:test@test.com"
+	sub := "test@test.com"
 	vapidPrivateKey := "MHcCAQEEIHF7ijDrb8gwj_9o7UuSx9t_oGlPMyOsG9YQLp3qJwLuoAoGCCqGSM49AwEHoUQDQgAEhB-nJdg0d5oOkdTYsKqbbuQ06ZUYkS0H-ELXsShIkpmcIVIO16Sj15YMBouesMbY4xPdepwF4Pj3QfaALRAG5Q"
 
 	// Create the request
@@ -52,7 +53,7 @@ func TestVAPID(t *testing.T) {
 
 	// Check the claims on the token
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		assert.Equal(sub, claims["sub"])
+		assert.Equal(fmt.Sprintf("mailto:%s", sub), claims["sub"])
 		assert.NotEmpty(claims["aud"], "Audience should not be empty")
 	} else {
 		t.Fatal(err)
