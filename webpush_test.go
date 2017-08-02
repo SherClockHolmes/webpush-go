@@ -10,7 +10,7 @@ import (
 type testHTTPClient struct{}
 
 func (*testHTTPClient) Do(*http.Request) (*http.Response, error) {
-	return &http.Response{StatusCode: 200}, nil
+	return &http.Response{StatusCode: 201}, nil
 }
 
 func getTestSubscription() *Subscription {
@@ -33,6 +33,6 @@ func TestSendNotification(t *testing.T) {
 		VAPIDPrivateKey: "testKey",
 	})
 
-	assert.Equal(200, resp.StatusCode)
+	assert.Equal(201, resp.StatusCode)
 	assert.Nil(err)
 }

@@ -37,7 +37,7 @@ func main() {
 
 	// Send Notification
 	_, err := webpush.SendNotification([]byte("Test"), &s, &webpush.Options{
-		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
+		Subscriber:      "<EMAIL@EXAMPLE.COM>",
 		TTL:             60,
 		VAPIDPrivateKey: vapidPrivateKey,
 	})
