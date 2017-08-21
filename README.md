@@ -38,7 +38,6 @@ func main() {
 	// Send Notification
 	_, err := webpush.SendNotification([]byte("Test"), &s, &webpush.Options{
 		Subscriber:      "<EMAIL@EXAMPLE.COM>",
-		TTL:             60,
 		VAPIDPrivateKey: vapidPrivateKey,
 	})
 	if err != nil {
@@ -58,11 +57,11 @@ if err != nil {
 }
 ```
 
-## Dependencies
+## Development
 
 1. Install [Go 1.8+](https://golang.org/) ([gvm](https://github.com/moovweb/gvm) recommended)
-2. Get [gvt](https://github.com/FiloSottile/gvt) `go get -u github.com/FiloSottile/gvt`
-3. `gvt restore`
+2. `go get -u github.com/golang/dep/cmd/dep`
+3. `dep ensure`
 
 ## References
 

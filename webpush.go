@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -60,18 +61,18 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Decode auth and p256
 	clientAuthSecret, err := decodeSubscriptionKey(s.Keys.Auth)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	clientPublicKey, err := decodeSubscriptionKey(s.Keys.P256dh)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// Generate 16 byte salt
 	salt, err := saltFunc()
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// P256 curve
@@ -80,15 +81,15 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Generate the public / private key pair
 	privateKey, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	publicKey := elliptic.Marshal(curve, x, y)
 
 	// Shared secret
 	publicKeyX, publicKeyY := elliptic.Unmarshal(curve, clientPublicKey)
-	if publicKeyY == nil {
-		return &http.Response{}, err
+	if publicKeyX == nil {
+		return nil, errors.New("Unmarshal Error: Public key is not a valid point on the curve")
 	}
 
 	sx, _ := curve.ScalarMult(publicKeyX, publicKeyY, privateKey)
@@ -102,7 +103,7 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	prkHKDF := hkdf.New(hash, sharedSecret, clientAuthSecret, info)
 	prk, err := getHKDFKey(prkHKDF, 32)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// Derive Content Encryption Key
@@ -110,7 +111,7 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	contentHKDF := hkdf.New(hash, prk, salt, contentEncryptionKeyInfo)
 	contentEncryptionKey, err := getHKDFKey(contentHKDF, 16)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// Derive the Nonce
@@ -118,18 +119,18 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	nonceHKDF := hkdf.New(hash, prk, salt, nonceInfo)
 	nonce, err := getHKDFKey(nonceHKDF, 12)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// Cipher
 	c, err := aes.NewCipher(contentEncryptionKey)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	gcm, err := cipher.NewGCM(c)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// Padding
@@ -142,7 +143,7 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// POST request
 	req, err := http.NewRequest("POST", s.Endpoint, ioutil.NopCloser(bytes.NewReader(ciphertext)))
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	req.Header.Set("Encryption", fmt.Sprintf("salt=%s", base64.RawURLEncoding.EncodeToString(salt)))
@@ -153,7 +154,7 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Set VAPID headers
 	err = vapid(req, s, options)
 	if err != nil {
-		return &http.Response{}, err
+		return nil, err
 	}
 
 	// Send the request
