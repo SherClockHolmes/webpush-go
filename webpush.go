@@ -40,6 +40,8 @@ type Options struct {
 	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
 	Subscriber      string     // Sub in VAPID JWT token
 	TTL             int        // Set the TTL on the endpoint POST request
+	Urgency         string     // Set the Urgency header to change a message priority (Optional)
+	Topic           string     // Set the Topic header to collapse a pending messages (Optional)
 	VAPIDPrivateKey string     // Used to sign VAPID JWT token
 }
 
@@ -151,6 +153,13 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	req.Header.Set("Content-Encoding", "aesgcm")
 	req.Header.Set("TTL", strconv.Itoa(options.TTL))
 
+	if isValidUrgency(options.Urgency) {
+		req.Header.Set("Urgency", options.Urgency)
+	}
+	if len(options.Topic) > 0 {
+		req.Header.Set("Topic", options.Topic)
+	}
+
 	// Set VAPID headers
 	err = vapid(req, s, options)
 	if err != nil {
@@ -222,4 +231,12 @@ func getInfo(infoType, clientPublicKey, serverPublicKey []byte) []byte {
 	info.Write(getKeyInfo(serverPublicKey))
 
 	return info.Bytes()
+}
+
+func isValidUrgency(urgency string) bool {
+	switch urgency {
+	case "very-low", "low", "normal", "high":
+		return true
+	}
+	return false
 }
