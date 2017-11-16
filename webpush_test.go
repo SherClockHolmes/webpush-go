@@ -28,10 +28,10 @@ func TestSendNotification(t *testing.T) {
 
 	resp, err := SendNotification([]byte("Test"), getTestSubscription(), &Options{
 		HTTPClient:      &testHTTPClient{},
-		Urgency:         "low",
 		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
 		Topic:           "test_topic",
 		TTL:             0,
+		Urgency:         "low",
 		VAPIDPrivateKey: "testKey",
 	})
 
