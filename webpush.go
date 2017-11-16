@@ -20,6 +20,22 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
+// Urgency indicates to the push service how important a message is to the user.
+// This can be used by the push service to help conserve the battery life of a user's device
+// by only waking up for important messages when battery is low.
+type Urgency string
+
+const (
+	// UrgencyVeryLow requires device state: on power and Wi-Fi
+	UrgencyVeryLow Urgency = "very-low"
+	// UrgencyLow requires device state: on either power or Wi-Fi
+	UrgencyLow Urgency = "low"
+	// UrgencyNormal excludes device state: low battery
+	UrgencyNormal Urgency = "normal"
+	// UrgencyHigh admits device state: low battery
+	UrgencyHigh Urgency = "high"
+)
+
 var saltFunc = func() ([]byte, error) {
 	salt := make([]byte, 16)
 	_, err := io.ReadFull(rand.Reader, salt)
@@ -39,7 +55,9 @@ type HTTPClient interface {
 type Options struct {
 	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
 	Subscriber      string     // Sub in VAPID JWT token
+	Topic           string     // Set the Topic header to collapse a pending messages (Optional)
 	TTL             int        // Set the TTL on the endpoint POST request
+	Urgency         Urgency    // Set the Urgency header to change a message priority (Optional)
 	VAPIDPrivateKey string     // Used to sign VAPID JWT token
 }
 
@@ -151,6 +169,14 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	req.Header.Set("Content-Encoding", "aesgcm")
 	req.Header.Set("TTL", strconv.Itoa(options.TTL))
 
+	// Сhecking the optional headers
+	if isValidUrgency(options.Urgency) {
+		req.Header.Set("Urgency", string(options.Urgency))
+	}
+	if len(options.Topic) > 0 {
+		req.Header.Set("Topic", options.Topic)
+	}
+
 	// Set VAPID headers
 	err = vapid(req, s, options)
 	if err != nil {
@@ -222,4 +248,13 @@ func getInfo(infoType, clientPublicKey, serverPublicKey []byte) []byte {
 	info.Write(getKeyInfo(serverPublicKey))
 
 	return info.Bytes()
+}
+
+// Checking allowable values for the urgency header
+func isValidUrgency(urgency Urgency) bool {
+	switch urgency {
+	case UrgencyVeryLow, UrgencyLow, UrgencyNormal, UrgencyHigh:
+		return true
+	}
+	return false
 }
