@@ -59,6 +59,9 @@ type Options struct {
 	TTL             int        // Set the TTL on the endpoint POST request
 	Urgency         Urgency    // Set the Urgency header to change a message priority (Optional)
 	VAPIDPrivateKey string     // Used to sign VAPID JWT token
+	// Used for Authorization in older Chromium browsers:
+	// https://web-push-book.gauntface.com/chapter-06/01-non-standards-browsers/#what-is-gcm_sender_id
+	LegacyGCMAuthorization string
 }
 
 // Keys are the base64 encoded values from PushSubscription.getKey()
@@ -177,10 +180,15 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 		req.Header.Set("Topic", options.Topic)
 	}
 
-	// Set VAPID headers
-	err = vapid(req, s, options)
-	if err != nil {
-		return nil, err
+	if len(options.LegacyGCMAuthorization) > 0 && strings.HasPrefix(s.Endpoint, "https://android.googleapis.com/gcm/send") {
+		// Support older Chromium versions which don't yet support VAPID
+		req.Header.Set("Authorization", fmt.Sprintf("key=%s", options.LegacyGCMAuthorization))
+	} else {
+		// Set VAPID headers
+		err = vapid(req, s, options)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Send the request
@@ -202,15 +210,17 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 // decodes a base64 subscription key.
 // if necessary, add "=" padding to the key for URL decode
 func decodeSubscriptionKey(key string) ([]byte, error) {
-	b64 := base64.URLEncoding
-
 	// "=" padding
 	buf := bytes.NewBufferString(key)
 	if rem := len(key) % 4; rem != 0 {
 		buf.WriteString(strings.Repeat("=", 4-rem))
 	}
 
-	return b64.DecodeString(buf.String())
+	bytes, err := base64.StdEncoding.DecodeString(buf.String())
+	if err == nil {
+		return bytes, nil
+	}
+	return base64.URLEncoding.DecodeString(buf.String())
 }
 
 // Returns a key of length "length" given an hkdf function

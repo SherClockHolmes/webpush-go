@@ -13,7 +13,7 @@ func (*testHTTPClient) Do(*http.Request) (*http.Response, error) {
 	return &http.Response{StatusCode: 201}, nil
 }
 
-func getTestSubscription() *Subscription {
+func getURLEncodedTestSubscription() *Subscription {
 	return &Subscription{
 		Endpoint: "https://updates.push.services.mozilla.com/wpush/v2/gAAAAA",
 		Keys: Keys{
@@ -23,10 +23,20 @@ func getTestSubscription() *Subscription {
 	}
 }
 
-func TestSendNotification(t *testing.T) {
+func getStandardEncodedTestSubscription() *Subscription {
+	return &Subscription{
+		Endpoint: "https://updates.push.services.mozilla.com/wpush/v2/gAAAAA",
+		Keys: Keys{
+			P256dh: "BNNL5ZaTfK81qhXOx23+wewhigUeFb632jN6LvRWCFH1ubQr77FE/9qV1FuojuRmHP42zmf34rXgW80OvUVDgTk=",
+			Auth:   "zqbxT6JKstKSY9JKibZLSQ==",
+		},
+	}
+}
+
+func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
 	assert := assert.New(t)
 
-	resp, err := SendNotification([]byte("Test"), getTestSubscription(), &Options{
+	resp, err := SendNotification([]byte("Test"), getURLEncodedTestSubscription(), &Options{
 		HTTPClient:      &testHTTPClient{},
 		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
 		Topic:           "test_topic",
@@ -35,6 +45,22 @@ func TestSendNotification(t *testing.T) {
 		VAPIDPrivateKey: "testKey",
 	})
 
-	assert.Equal(201, resp.StatusCode)
 	assert.Nil(err)
+	assert.Equal(201, resp.StatusCode)
+}
+
+func TestSendNotificationToStandardEncodedSubscription(t *testing.T) {
+	assert := assert.New(t)
+
+	resp, err := SendNotification([]byte("Test"), getStandardEncodedTestSubscription(), &Options{
+		HTTPClient:      &testHTTPClient{},
+		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
+		Topic:           "test_topic",
+		TTL:             0,
+		Urgency:         "low",
+		VAPIDPrivateKey: "testKey",
+	})
+
+	assert.Nil(err)
+	assert.Equal(201, resp.StatusCode)
 }
