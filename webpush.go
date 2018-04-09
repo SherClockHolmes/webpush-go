@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
@@ -162,7 +161,7 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	ciphertext := gcm.Seal([]byte{}, nonce, plaintext, nil)
 
 	// POST request
-	req, err := http.NewRequest("POST", s.Endpoint, ioutil.NopCloser(bytes.NewReader(ciphertext)))
+	req, err := http.NewRequest("POST", s.Endpoint, bytes.NewReader(ciphertext))
 	if err != nil {
 		return nil, err
 	}
