@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"log"
 
-	webpush "github.com/sherclockholmes/webpush-go"
+	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
 const (
