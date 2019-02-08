@@ -11,37 +11,31 @@ go get -u github.com/SherClockHolmes/webpush-go
 
 ## Example
 
-```golang
+For a full example, refer to the code in the [example](example/) directory.
+
+```go
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"log"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
-const (
-	vapidPrivateKey = "<YOUR VAPID PRIVATE KEY>"
-)
-
 func main() {
-	subJSON := `{<YOUR SUBSCRIPTION JSON>}`
-
 	// Decode subscription
-	s := webpush.Subscription{}
-	if err := json.NewDecoder(bytes.NewBufferString(subJSON)).Decode(&s); err != nil {
-		log.Fatal(err)
-	}
+	s := &webpush.Subscription{}
+	json.Unmarshal([]byte("<YOUR_SUBSCRIPTION>"), s)
 
 	// Send Notification
-	_, err := webpush.SendNotification([]byte("Test"), &s, &webpush.Options{
-		Subscriber:      "<EMAIL@EXAMPLE.COM>",
-		VAPIDPrivateKey: vapidPrivateKey,
+	_, err := webpush.SendNotification([]byte("Testifajhasfjhbasfjhbafsjhbafsjhbasfjhasfjhbasfjhbasfjhbafsjhbasfjhbafsjhbafshjbafsbhjasfjhbafsjhbasfsdsdgfdsgjhbfasjhbafsjhbafsjhbasfbhjasfjhbafsjhbafsjbhasfjhbafsjbhasfjhbafsjhbasfujyhbeqftuyih3wtruy3425tuyi4t23whjubfsadjhbfsd"), s, &webpush.Options{
+		Subscriber:      "example@example.com",
+		VAPIDPublicKey:  "<YOUR_VAPID_PUBLIC_KEY>",
+		VAPIDPrivateKey: "<YOUR_VAPID_PRIVATE_KEY>",
+		TTL:             30,
 	})
 	if err != nil {
-		log.Fatal(err)
+		// TODO: Handle error
 	}
 }
 ```
@@ -59,20 +53,10 @@ if err != nil {
 
 ## Development
 
-1. Install [Go 1.8+](https://golang.org/) ([gvm](https://github.com/moovweb/gvm) recommended)
-2. `go get -u github.com/golang/dep/cmd/dep`
-3. `dep ensure`
+1. Install [Go 1.11+](https://golang.org/)
+2. `go mod vendor`
+3. `go test`
 
-## References
+### For other language implementations visit:
 
-For more information visit these [Google Developers](https://developers.google.com/web) links:
-
-[https://developers.google.com/web/updates/2016/03/web-push-encryption](https://developers.google.com/web/updates/2016/03/web-push-encryption)  
-[https://developers.google.com/web/updates/2016/07/web-push-interop-wins](https://developers.google.com/web/updates/2016/07/web-push-interop-wins)
-
-### Similar Projects / Inspired By
-
-- [Push Encryption (Go)](https://github.com/GoogleChrome/push-encryption-go)
-- [go-ecdh](https://github.com/wsddn/go-ecdh)
-- [WebPush Libs](https://github.com/web-push-libs)
-- [Web Push: Data Encryption Test Page](https://jrconlin.github.io/WebPushDataTestPage/)
+[WebPush Libs](https://github.com/web-push-libs)

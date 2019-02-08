@@ -10,7 +10,6 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -19,20 +18,9 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// Urgency indicates to the push service how important a message is to the user.
-// This can be used by the push service to help conserve the battery life of a user's device
-// by only waking up for important messages when battery is low.
-type Urgency string
-
 const (
-	// UrgencyVeryLow requires device state: on power and Wi-Fi
-	UrgencyVeryLow Urgency = "very-low"
-	// UrgencyLow requires device state: on either power or Wi-Fi
-	UrgencyLow Urgency = "low"
-	// UrgencyNormal excludes device state: low battery
-	UrgencyNormal Urgency = "normal"
-	// UrgencyHigh admits device state: low battery
-	UrgencyHigh Urgency = "high"
+	maxRecordSize   uint32 = 4096
+	maxRecordLength int    = int(maxRecordSize) - 16
 )
 
 var saltFunc = func() ([]byte, error) {
@@ -46,21 +34,20 @@ var saltFunc = func() ([]byte, error) {
 }
 
 // HTTPClient is an exposed interface to pass in custom http.Client
-type HTTPClient interface {
+type httpClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
 // Options are config and extra params needed to send a notification
 type Options struct {
-	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
-	Subscriber      string     // Sub in VAPID JWT token
-	Topic           string     // Set the Topic header to collapse a pending messages (Optional)
-	TTL             int        // Set the TTL on the endpoint POST request
-	Urgency         Urgency    // Set the Urgency header to change a message priority (Optional)
-	VAPIDPrivateKey string     // Used to sign VAPID JWT token
-	// Used for Authorization in older Chromium browsers:
-	// https://web-push-book.gauntface.com/chapter-06/01-non-standards-browsers/#what-is-gcm_sender_id
-	LegacyGCMAuthorization string
+	httpClient httpClient
+
+	Subscriber      string  // Sub in VAPID JWT token
+	Topic           string  // Set the Topic header to collapse a pending messages (Optional)
+	TTL             int     // Set the TTL on the endpoint POST request
+	Urgency         Urgency // Set the Urgency header to change a message priority (Optional)
+	VAPIDPublicKey  string  // VAPID public key, passed in VAPID Authorization header
+	VAPIDPrivateKey string  // VAPID private key, used to sign VAPID JWT token
 }
 
 // Keys are the base64 encoded values from PushSubscription.getKey()
@@ -75,16 +62,18 @@ type Subscription struct {
 	Keys     Keys   `json:"keys"`
 }
 
-// SendNotification sends a push notification to a subscriptions endpoint
-// Follows the Message Encryption for Web Push, and VAPID protocols
+// SendNotification sends a push notification to a subscription's endpoint
+// Message Encryption for Web Push, and VAPID protocols.
+// FOR MORE INFORMATION SEE rfc8291: https://datatracker.ietf.org/doc/rfc8291
 func SendNotification(message []byte, s *Subscription, options *Options) (*http.Response, error) {
-	// Decode auth and p256
-	clientAuthSecret, err := decodeSubscriptionKey(s.Keys.Auth)
+	// Authentication secret (auth_secret)
+	authSecret, err := decodeSubscriptionKey(s.Keys.Auth)
 	if err != nil {
 		return nil, err
 	}
 
-	clientPublicKey, err := decodeSubscriptionKey(s.Keys.P256dh)
+	// dh (Diffie Hellman)
+	dh, err := decodeSubscriptionKey(s.Keys.P256dh)
 	if err != nil {
 		return nil, err
 	}
@@ -95,48 +84,50 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 		return nil, err
 	}
 
-	// P256 curve
+	// Create the ecdh_secret shared key pair
 	curve := elliptic.P256()
 
-	// Generate the public / private key pair
-	privateKey, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
+	// Application server key pairs (single use)
+	localPrivateKey, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	publicKey := elliptic.Marshal(curve, x, y)
+	localPublicKey := elliptic.Marshal(curve, x, y)
 
-	// Shared secret
-	publicKeyX, publicKeyY := elliptic.Unmarshal(curve, clientPublicKey)
-	if publicKeyX == nil {
+	// Combine application keys with dh
+	sharedX, sharedY := elliptic.Unmarshal(curve, dh)
+	if sharedX == nil {
 		return nil, errors.New("Unmarshal Error: Public key is not a valid point on the curve")
 	}
 
-	sx, _ := curve.ScalarMult(publicKeyX, publicKeyY, privateKey)
-	sharedSecret := sx.Bytes()
+	sx, _ := curve.ScalarMult(sharedX, sharedY, localPrivateKey)
+	sharedECDHSecret := sx.Bytes()
 
-	// HKDF
 	hash := sha256.New
-	info := []byte("Content-Encoding: auth\x00")
 
-	// Create the key derivation function
-	prkHKDF := hkdf.New(hash, sharedSecret, clientAuthSecret, info)
-	prk, err := getHKDFKey(prkHKDF, 32)
+	// ikm
+	prkInfoBuf := bytes.NewBuffer([]byte("WebPush: info\x00"))
+	prkInfoBuf.Write(dh)
+	prkInfoBuf.Write(localPublicKey)
+
+	prkHKDF := hkdf.New(hash, sharedECDHSecret, authSecret, prkInfoBuf.Bytes())
+	ikm, err := getHKDFKey(prkHKDF, 32)
 	if err != nil {
 		return nil, err
 	}
 
 	// Derive Content Encryption Key
-	contentEncryptionKeyInfo := getInfo([]byte("aesgcm"), clientPublicKey, publicKey)
-	contentHKDF := hkdf.New(hash, prk, salt, contentEncryptionKeyInfo)
+	contentEncryptionKeyInfo := []byte("Content-Encoding: aes128gcm\x00")
+	contentHKDF := hkdf.New(hash, ikm, salt, contentEncryptionKeyInfo)
 	contentEncryptionKey, err := getHKDFKey(contentHKDF, 16)
 	if err != nil {
 		return nil, err
 	}
 
 	// Derive the Nonce
-	nonceInfo := getInfo([]byte("nonce"), clientPublicKey, publicKey)
-	nonceHKDF := hkdf.New(hash, prk, salt, nonceInfo)
+	nonceInfo := []byte("Content-Encoding: nonce\x00")
+	nonceHKDF := hkdf.New(hash, ikm, salt, nonceInfo)
 	nonce, err := getHKDFKey(nonceHKDF, 12)
 	if err != nil {
 		return nil, err
@@ -153,60 +144,70 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 		return nil, err
 	}
 
-	// Padding
-	padding := make([]byte, 2)
-	plaintext := append(padding, message...)
+	// Encryption Content-Coding Header
+	recordBuf := bytes.NewBuffer(salt)
 
-	// Encrypt
-	ciphertext := gcm.Seal([]byte{}, nonce, plaintext, nil)
+	rs := make([]byte, 4)
+	binary.BigEndian.PutUint32(rs, maxRecordSize)
+
+	recordBuf.Write(rs)
+	recordBuf.Write([]byte{byte(len(localPublicKey))})
+	recordBuf.Write(localPublicKey)
+
+	// Data
+	dataBuf := bytes.NewBuffer(message)
+
+	// Pad content to max record size - 16 - header
+	// Padding ending delimeter
+	dataBuf.Write([]byte("\x02"))
+	pad(dataBuf, maxRecordLength-recordBuf.Len())
+
+	// Compose the ciphertext
+	ciphertext := gcm.Seal([]byte{}, nonce, dataBuf.Bytes(), nil)
+	recordBuf.Write(ciphertext)
 
 	// POST request
-	req, err := http.NewRequest("POST", s.Endpoint, bytes.NewReader(ciphertext))
+	req, err := http.NewRequest("POST", s.Endpoint, recordBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Encryption", fmt.Sprintf("salt=%s", base64.RawURLEncoding.EncodeToString(salt)))
-	req.Header.Set("Crypto-Key", fmt.Sprintf("dh=%s", base64.RawURLEncoding.EncodeToString(publicKey)))
-	req.Header.Set("Content-Encoding", "aesgcm")
+	req.Header.Set("Content-Encoding", "aes128gcm")
+	req.Header.Set("Content-Length", strconv.Itoa(len(ciphertext)))
+	req.Header.Set("Content-Type", "application/octet-stream")
 	req.Header.Set("TTL", strconv.Itoa(options.TTL))
 
-	// Сhecking the optional headers
-	if isValidUrgency(options.Urgency) {
-		req.Header.Set("Urgency", string(options.Urgency))
-	}
+	// Сheck the optional headers
 	if len(options.Topic) > 0 {
 		req.Header.Set("Topic", options.Topic)
 	}
 
-	if len(options.LegacyGCMAuthorization) > 0 && strings.HasPrefix(s.Endpoint, "https://android.googleapis.com/gcm/send") {
-		// Support older Chromium versions which don't yet support VAPID
-		req.Header.Set("Authorization", fmt.Sprintf("key=%s", options.LegacyGCMAuthorization))
-	} else {
-		// Set VAPID headers
-		err = vapid(req, s, options)
-		if err != nil {
-			return nil, err
-		}
+	if isValidUrgency(options.Urgency) {
+		req.Header.Set("Urgency", string(options.Urgency))
 	}
+
+	// Get VAPID Authorization header
+	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
+		s.Endpoint,
+		options.Subscriber,
+		options.VAPIDPublicKey,
+		options.VAPIDPrivateKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", vapidAuthHeader)
 
 	// Send the request
-	var client HTTPClient
-	if options.HTTPClient != nil {
-		client = options.HTTPClient
-	} else {
-		client = &http.Client{}
+	if options.httpClient == nil {
+		options.httpClient = &http.Client{}
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return resp, err
-	}
-
-	return resp, nil
+	return options.httpClient.Do(req)
 }
 
-// decodes a base64 subscription key.
+// decodeSubscriptionKey decodes a base64 subscription key.
 // if necessary, add "=" padding to the key for URL decode
 func decodeSubscriptionKey(key string) ([]byte, error) {
 	// "=" padding
@@ -233,37 +234,10 @@ func getHKDFKey(hkdf io.Reader, length int) ([]byte, error) {
 	return key, nil
 }
 
-// Helper for content encryption
-func getKeyInfo(key []byte) []byte {
-	length := uint16(len(key))
-	buf := make([]byte, 2)
-	binary.BigEndian.PutUint16(buf, length)
+func pad(payload *bytes.Buffer, maxPadLen int) {
+	payloadLen := payload.Len()
+	padLen := maxPadLen - payloadLen
 
-	var info bytes.Buffer
-	info.Write(buf)
-	info.Write(key)
-	return info.Bytes()
-}
-
-// Helper for content encryption
-func getInfo(infoType, clientPublicKey, serverPublicKey []byte) []byte {
-	var info bytes.Buffer
-	info.Write([]byte("Content-Encoding: "))
-	info.Write(infoType)
-	info.WriteByte(0)
-	info.Write([]byte("P-256"))
-	info.WriteByte(0)
-	info.Write(getKeyInfo(clientPublicKey))
-	info.Write(getKeyInfo(serverPublicKey))
-
-	return info.Bytes()
-}
-
-// Checking allowable values for the urgency header
-func isValidUrgency(urgency Urgency) bool {
-	switch urgency {
-	case UrgencyVeryLow, UrgencyLow, UrgencyNormal, UrgencyHigh:
-		return true
-	}
-	return false
+	padding := make([]byte, padLen)
+	payload.Write(padding)
 }
