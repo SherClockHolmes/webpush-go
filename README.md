@@ -28,7 +28,7 @@ func main() {
 	json.Unmarshal([]byte("<YOUR_SUBSCRIPTION>"), s)
 
 	// Send Notification
-	_, err := webpush.SendNotification([]byte("Testifajhasfjhbasfjhbafsjhbafsjhbasfjhasfjhbasfjhbasfjhbafsjhbasfjhbafsjhbafshjbafsbhjasfjhbafsjhbasfsdsdgfdsgjhbfasjhbafsjhbafsjhbasfbhjasfjhbafsjhbafsjbhasfjhbafsjbhasfjhbafsjhbasfujyhbeqftuyih3wtruy3425tuyi4t23whjubfsadjhbfsd"), s, &webpush.Options{
+	_, err := webpush.SendNotification([]byte("Test"), s, &webpush.Options{
 		Subscriber:      "example@example.com",
 		VAPIDPublicKey:  "<YOUR_VAPID_PUBLIC_KEY>",
 		VAPIDPrivateKey: "<YOUR_VAPID_PRIVATE_KEY>",
@@ -47,7 +47,7 @@ Use the helper method `GenerateVAPIDKeys` to generate the VAPID key pair.
 ```golang
 privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
 if err != nil {
-    // TODO: Handle failure!
+	// TODO: Handle error
 }
 ```
 
@@ -57,6 +57,6 @@ if err != nil {
 2. `go mod vendor`
 3. `go test`
 
-### For other language implementations visit:
+#### For other language implementations visit:
 
 [WebPush Libs](https://github.com/web-push-libs)

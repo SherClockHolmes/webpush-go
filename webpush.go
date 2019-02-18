@@ -23,6 +23,7 @@ const (
 	maxRecordLength int    = int(maxRecordSize) - 16
 )
 
+// saltFunc generates a salt of 16 bytes
 var saltFunc = func() ([]byte, error) {
 	salt := make([]byte, 16)
 	_, err := io.ReadFull(rand.Reader, salt)
@@ -33,7 +34,7 @@ var saltFunc = func() ([]byte, error) {
 	return salt, nil
 }
 
-// HTTPClient is an exposed interface to pass in custom http.Client
+// httpClient is an interface for sending the notification HTTP request / testing
 type httpClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
@@ -64,7 +65,7 @@ type Subscription struct {
 
 // SendNotification sends a push notification to a subscription's endpoint
 // Message Encryption for Web Push, and VAPID protocols.
-// FOR MORE INFORMATION SEE rfc8291: https://datatracker.ietf.org/doc/rfc8291
+// FOR MORE INFORMATION SEE RFC8291: https://datatracker.ietf.org/doc/rfc8291
 func SendNotification(message []byte, s *Subscription, options *Options) (*http.Response, error) {
 	// Authentication secret (auth_secret)
 	authSecret, err := decodeSubscriptionKey(s.Keys.Auth)
