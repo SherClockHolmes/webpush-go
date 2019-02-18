@@ -3,37 +3,35 @@ package webpush
 import (
 	"encoding/base64"
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestVAPID(t *testing.T) {
-	assert := assert.New(t)
-
 	s := getStandardEncodedTestSubscription()
 	sub := "test@test.com"
-	vapidPrivateKey := "MHcCAQEEIHF7ijDrb8gwj_9o7UuSx9t_oGlPMyOsG9YQLp3qJwLuoAoGCCqGSM49AwEHoUQDQgAEhB-nJdg0d5oOkdTYsKqbbuQ06ZUYkS0H-ELXsShIkpmcIVIO16Sj15YMBouesMbY4xPdepwF4Pj3QfaALRAG5Q"
 
-	// Create the request
-	req, err := http.NewRequest("POST", s.Endpoint, nil)
+	// Generate vapid keys
+	vapidPrivateKey, vapidPublicKey, err := GenerateVAPIDKeys()
 	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
+		t.Fatal(err)
 	}
 
-	// Run the request through vapid()
-	err = vapid(req, s, &Options{
-		Subscriber:      sub,
-		VAPIDPrivateKey: vapidPrivateKey,
-	})
-
-	assert.Nil(err)
+	// Get authentication header
+	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
+		s.Endpoint,
+		sub,
+		vapidPublicKey,
+		vapidPrivateKey,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Validate the token in the Authorization header
-	tokenString := getTokenFromAuthorizationHeader(req.Header.Get("Authorization"), t)
+	tokenString := getTokenFromAuthorizationHeader(vapidAuthHeader, t)
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
@@ -47,14 +45,24 @@ func TestVAPID(t *testing.T) {
 			t.Fatal("Could not decode VAPID private key")
 		}
 
-		pubKey, _ := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
-		return pubKey, nil
+		privKey := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
+		return privKey.Public(), nil
 	})
 
 	// Check the claims on the token
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		assert.Equal(fmt.Sprintf("mailto:%s", sub), claims["sub"])
-		assert.NotEmpty(claims["aud"], "Audience should not be empty")
+		expectedSub := fmt.Sprintf("mailto:%s", sub)
+		if expectedSub != claims["sub"] {
+			t.Fatalf(
+				"Incorreect mailto, expected=%s, got=%s",
+				expectedSub,
+				claims["sub"],
+			)
+		}
+
+		if claims["aud"] == "" {
+			t.Fatal("Audience should not be empty")
+		}
 	} else {
 		t.Fatal(err)
 	}
@@ -78,18 +86,15 @@ func TestVAPIDKeys(t *testing.T) {
 
 // Helper function for extracting the token from the Authorization header
 func getTokenFromAuthorizationHeader(tokenHeader string, t *testing.T) string {
-	split := strings.Split(tokenHeader, " ")
-	if len(split) < 2 {
-		t.Fatal("Failed to split header")
+	hsplit := strings.Split(tokenHeader, " ")
+	if len(hsplit) < 3 {
+		t.Fatal("Failed to auth split header")
 	}
 
-	switch split[0] {
-	case "WebPush":
-		fallthrough
-	case "Bearer":
-		return split[1]
+	tsplit := strings.Split(hsplit[1], "=")
+	if len(tsplit) < 2 {
+		t.Fatal("Failed to t split header on =")
 	}
 
-	t.Fatal("Something wrong happened")
-	return ""
+	return tsplit[1][:len(tsplit[1])-1]
 }
