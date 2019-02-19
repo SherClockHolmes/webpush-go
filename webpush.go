@@ -46,7 +46,7 @@ type Options struct {
 	Subscriber      string  // Sub in VAPID JWT token
 	Topic           string  // Set the Topic header to collapse a pending messages (Optional)
 	TTL             int     // Set the TTL on the endpoint POST request
-	Urgency         Urgency // Set the Urgency header to change a message priority (Optional)
+	Urgency         urgency // Set the urgency header to change a message priority (Optional)
 	VAPIDPublicKey  string  // VAPID public key, passed in VAPID Authorization header
 	VAPIDPrivateKey string  // VAPID private key, used to sign VAPID JWT token
 }
@@ -181,10 +181,6 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Сheck the optional headers
 	if len(options.Topic) > 0 {
 		req.Header.Set("Topic", options.Topic)
-	}
-
-	if isValidUrgency(options.Urgency) {
-		req.Header.Set("Urgency", string(options.Urgency))
 	}
 
 	// Get VAPID Authorization header
