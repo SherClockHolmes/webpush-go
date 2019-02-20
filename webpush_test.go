@@ -33,7 +33,7 @@ func getStandardEncodedTestSubscription() *Subscription {
 
 func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
 	resp, err := SendNotification([]byte("Test"), getURLEncodedTestSubscription(), &Options{
-		httpClient:      &testHTTPClient{},
+		HTTPClient:      &testHTTPClient{},
 		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
 		Topic:           "test_topic",
 		TTL:             0,
@@ -56,7 +56,7 @@ func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
 
 func TestSendNotificationToStandardEncodedSubscription(t *testing.T) {
 	resp, err := SendNotification([]byte("Test"), getStandardEncodedTestSubscription(), &Options{
-		httpClient:      &testHTTPClient{},
+		HTTPClient:      &testHTTPClient{},
 		Subscriber:      "mailto:<EMAIL@EXAMPLE.COM>",
 		Topic:           "test_topic",
 		TTL:             0,
