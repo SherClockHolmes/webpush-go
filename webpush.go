@@ -183,6 +183,8 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 		req.Header.Set("Topic", options.Topic)
 	}
 
+	req.Header.Set("Urgency", string(options.Urgency))
+
 	// Get VAPID Authorization header
 	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
 		s.Endpoint,
