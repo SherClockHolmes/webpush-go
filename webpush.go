@@ -18,10 +18,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-const (
-	maxRecordSize   uint32 = 4096
-	maxRecordLength int    = int(maxRecordSize) - 16
-)
+const MaxRecordSize uint32 = 4096
 
 // saltFunc generates a salt of 16 bytes
 var saltFunc = func() ([]byte, error) {
@@ -42,6 +39,7 @@ type HTTPClient interface {
 // Options are config and extra params needed to send a notification
 type Options struct {
 	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
+	RecordSize      uint32     // Limit the record size
 	Subscriber      string     // Sub in VAPID JWT token
 	Topic           string     // Set the Topic header to collapse a pending messages (Optional)
 	TTL             int        // Set the TTL on the endpoint POST request
@@ -144,11 +142,19 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 		return nil, err
 	}
 
+	// Get the record size
+	recordSize := options.RecordSize
+	if recordSize == 0 {
+		recordSize = MaxRecordSize
+	}
+
+	recordLength := int(recordSize) - 16
+
 	// Encryption Content-Coding Header
 	recordBuf := bytes.NewBuffer(salt)
 
 	rs := make([]byte, 4)
-	binary.BigEndian.PutUint32(rs, maxRecordSize)
+	binary.BigEndian.PutUint32(rs, recordSize)
 
 	recordBuf.Write(rs)
 	recordBuf.Write([]byte{byte(len(localPublicKey))})
@@ -160,7 +166,7 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Pad content to max record size - 16 - header
 	// Padding ending delimeter
 	dataBuf.Write([]byte("\x02"))
-	pad(dataBuf, maxRecordLength-recordBuf.Len())
+	pad(dataBuf, recordLength-recordBuf.Len())
 
 	// Compose the ciphertext
 	ciphertext := gcm.Seal([]byte{}, nonce, dataBuf.Bytes(), nil)
