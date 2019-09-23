@@ -77,8 +77,8 @@ func getVAPIDAuthorizationHeader(
 		"sub": fmt.Sprintf("mailto:%s", subscriber),
 	})
 
-	// ECDSA
-	decodedVapidPrivateKey, err := base64.RawURLEncoding.DecodeString(vapidPrivateKey)
+	// Decode the vapid private key (base64)
+	decodedVapidPrivateKey, err := decodeVapidPrivateKey(vapidPrivateKey)
 	if err != nil {
 		return "", err
 	}
@@ -96,4 +96,15 @@ func getVAPIDAuthorizationHeader(
 		jwtString,
 		vapidPublicKey,
 	), nil
+}
+
+// Need to decode the vapid private key in multiple base64 formats
+// Solution from: https://github.com/SherClockHolmes/webpush-go/issues/29
+func decodeVapidPrivateKey(key string) ([]byte, error) {
+	bytes, err := base64.URLEncoding.DecodeString(key)
+	if err == nil {
+		return bytes, nil
+	}
+
+	return base64.RawURLEncoding.DecodeString(key)
 }
