@@ -1,4 +1,4 @@
-module github.com/SherClockHolmes/webpush-go
+module github.com/dapperlabs/webpush-go
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
