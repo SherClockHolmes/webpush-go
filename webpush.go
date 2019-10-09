@@ -166,7 +166,9 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	// Pad content to max record size - 16 - header
 	// Padding ending delimeter
 	dataBuf.Write([]byte("\x02"))
-	pad(dataBuf, recordLength-recordBuf.Len())
+	if err := pad(dataBuf, recordLength-recordBuf.Len()); err != nil {
+		return nil, err
+	}
 
 	// Compose the ciphertext
 	ciphertext := gcm.Seal([]byte{}, nonce, dataBuf.Bytes(), nil)
@@ -243,10 +245,16 @@ func getHKDFKey(hkdf io.Reader, length int) ([]byte, error) {
 	return key, nil
 }
 
-func pad(payload *bytes.Buffer, maxPadLen int) {
+func pad(payload *bytes.Buffer, maxPadLen int) error {
 	payloadLen := payload.Len()
+	if payloadLen > maxPadLen {
+		return errors.New("payload is too large")
+	}
+
 	padLen := maxPadLen - payloadLen
 
 	padding := make([]byte, padLen)
 	payload.Write(padding)
+
+	return nil
 }
