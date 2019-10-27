@@ -18,7 +18,7 @@ func main() {
 	json.Unmarshal([]byte(subscription), s)
 
 	// Send Notification
-	_, err := webpush.SendNotification([]byte("Test"), s, &webpush.Options{
+	resp, err := webpush.SendNotification([]byte("Test"), s, &webpush.Options{
 		Subscriber:      "example@example.com", // Do not include "mailto:"
 		VAPIDPublicKey:  vapidPublicKey,
 		VAPIDPrivateKey: vapidPrivateKey,
@@ -27,4 +27,5 @@ func main() {
 	if err != nil {
 		// TODO: Handle error
 	}
+	defer resp.Body.Close()
 }
