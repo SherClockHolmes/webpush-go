@@ -88,6 +88,6 @@ func TestSendTooLargeNotification(t *testing.T) {
 		VAPIDPrivateKey: "testKey",
 	})
 	if err == nil {
-		t.Fatal("Expected error with too large payload")
+		t.Fatalf("Error is nil, expected=%s", ErrMaxPadExceeded)
 	}
 }

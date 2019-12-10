@@ -20,6 +20,8 @@ import (
 
 const MaxRecordSize uint32 = 4096
 
+var ErrMaxPadExceeded = errors.New("payload has exceeded the maximum length")
+
 // saltFunc generates a salt of 16 bytes
 var saltFunc = func() ([]byte, error) {
 	salt := make([]byte, 16)
@@ -248,7 +250,7 @@ func getHKDFKey(hkdf io.Reader, length int) ([]byte, error) {
 func pad(payload *bytes.Buffer, maxPadLen int) error {
 	payloadLen := payload.Len()
 	if payloadLen > maxPadLen {
-		return errors.New("payload is too large")
+		return ErrMaxPadExceeded
 	}
 
 	padLen := maxPadLen - payloadLen
