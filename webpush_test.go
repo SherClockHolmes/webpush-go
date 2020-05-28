@@ -2,6 +2,7 @@ package webpush
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -74,5 +75,19 @@ func TestSendNotificationToStandardEncodedSubscription(t *testing.T) {
 			resp.StatusCode,
 			201,
 		)
+	}
+}
+
+func TestSendTooLargeNotification(t *testing.T) {
+	_, err := SendNotification([]byte(strings.Repeat("Test", int(MaxRecordSize))), getStandardEncodedTestSubscription(), &Options{
+		HTTPClient:      &testHTTPClient{},
+		Subscriber:      "<EMAIL@EXAMPLE.COM>",
+		Topic:           "test_topic",
+		TTL:             0,
+		Urgency:         "low",
+		VAPIDPrivateKey: "testKey",
+	})
+	if err == nil {
+		t.Fatalf("Error is nil, expected=%s", ErrMaxPadExceeded)
 	}
 }
