@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 )
 
 func TestVAPID(t *testing.T) {
