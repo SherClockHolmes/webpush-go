@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 )
 
 // GenerateVAPIDKeys will create a private and public VAPID key pair
