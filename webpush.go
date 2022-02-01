@@ -2,6 +2,7 @@ package webpush
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/elliptic"
@@ -62,10 +63,15 @@ type Subscription struct {
 	Keys     Keys   `json:"keys"`
 }
 
-// SendNotification sends a push notification to a subscription's endpoint
+// SendNotification calls SendNotificationWithContext with default context for backwards-compatibility
+func SendNotification(message []byte, s *Subscription, options *Options) (*http.Response, error) {
+	return SendNotificationWithContext(context.Background(), message, s, options)
+}
+
+// SendNotificationWithContext sends a push notification to a subscription's endpoint
 // Message Encryption for Web Push, and VAPID protocols.
 // FOR MORE INFORMATION SEE RFC8291: https://datatracker.ietf.org/doc/rfc8291
-func SendNotification(message []byte, s *Subscription, options *Options) (*http.Response, error) {
+func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscription, options *Options) (*http.Response, error) {
 	// Authentication secret (auth_secret)
 	authSecret, err := decodeSubscriptionKey(s.Keys.Auth)
 	if err != nil {
@@ -180,6 +186,10 @@ func SendNotification(message []byte, s *Subscription, options *Options) (*http.
 	req, err := http.NewRequest("POST", s.Endpoint, recordBuf)
 	if err != nil {
 		return nil, err
+	}
+
+	if ctx != nil {
+		req = req.WithContext(ctx)
 	}
 
 	req.Header.Set("Content-Encoding", "aes128gcm")
