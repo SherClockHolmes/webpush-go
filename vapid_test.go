@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang-jwt/jwt"
 )
@@ -25,6 +26,7 @@ func TestVAPID(t *testing.T) {
 		sub,
 		vapidPublicKey,
 		vapidPrivateKey,
+		time.Now().Add(time.Hour*12),
 	)
 	if err != nil {
 		t.Fatal(err)

@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/hkdf"
 )
@@ -49,6 +50,7 @@ type Options struct {
 	Urgency         Urgency    // Set the Urgency header to change a message priority (Optional)
 	VAPIDPublicKey  string     // VAPID public key, passed in VAPID Authorization header
 	VAPIDPrivateKey string     // VAPID private key, used to sign VAPID JWT token
+	VapidExpiration time.Time  // optional expiration for VAPID JWT token (defaults to now + 12 hours)
 }
 
 // Keys are the base64 encoded values from PushSubscription.getKey()
@@ -206,12 +208,18 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 		req.Header.Set("Urgency", string(options.Urgency))
 	}
 
+	expiration := options.VapidExpiration
+	if expiration.IsZero() {
+		expiration = time.Now().Add(time.Hour * 12)
+	}
+
 	// Get VAPID Authorization header
 	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
 		s.Endpoint,
 		options.Subscriber,
 		options.VAPIDPublicKey,
 		options.VAPIDPrivateKey,
+		expiration,
 	)
 	if err != nil {
 		return nil, err
