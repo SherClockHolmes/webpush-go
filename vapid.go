@@ -5,7 +5,6 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"math/big"
 	"net/url"
 	"time"
@@ -72,9 +71,9 @@ func getVAPIDAuthorizationHeader(
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
-		"aud": fmt.Sprintf("%s://%s", subURL.Scheme, subURL.Host),
+		"aud": subURL.Scheme + "://" + subURL.Host,
 		"exp": time.Now().Add(time.Hour * 12).Unix(),
-		"sub": fmt.Sprintf("mailto:%s", subscriber),
+		"sub": "mailto:" + subscriber,
 	})
 
 	// Decode the VAPID private key
@@ -97,11 +96,7 @@ func getVAPIDAuthorizationHeader(
 		return "", err
 	}
 
-	return fmt.Sprintf(
-		"vapid t=%s, k=%s",
-		jwtString,
-		base64.RawURLEncoding.EncodeToString(pubKey),
-	), nil
+	return "vapid t=" + jwtString + ", k=" + base64.RawURLEncoding.EncodeToString(pubKey), nil
 }
 
 // Need to decode the vapid private key in multiple base64 formats
