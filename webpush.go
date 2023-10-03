@@ -103,14 +103,20 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 
 	localPublicKey := elliptic.Marshal(curve, x, y)
 
-	// Combine application keys with dh
+	// Combine application keys with receiver's EC public key
 	sharedX, sharedY := elliptic.Unmarshal(curve, dh)
 	if sharedX == nil {
 		return nil, errors.New("Unmarshal Error: Public key is not a valid point on the curve")
 	}
 
-	sx, _ := curve.ScalarMult(sharedX, sharedY, localPrivateKey)
-	sharedECDHSecret := sx.Bytes()
+	// Derive ECDH shared secret
+	sx, sy := curve.ScalarMult(sharedX, sharedY, localPrivateKey)
+	if !curve.IsOnCurve(sx, sy) {
+		return nil, errors.New("Encryption error: ECDH shared secret isn't on curve")
+	}
+	mlen := curve.Params().BitSize / 8
+	sharedECDHSecret := make([]byte, mlen)
+	sx.FillBytes(sharedECDHSecret)
 
 	hash := sha256.New
 
