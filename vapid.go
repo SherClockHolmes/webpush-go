@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -72,10 +73,15 @@ func getVAPIDAuthorizationHeader(
 		return "", err
 	}
 
+	// Unless subscriber is an HTTPS URL, assume an e-mail address
+	if !strings.HasPrefix(subscriber, "https:") {
+		subscriber = fmt.Sprintf("mailto:%s", subscriber)
+	}
+
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"aud": fmt.Sprintf("%s://%s", subURL.Scheme, subURL.Host),
 		"exp": expiration.Unix(),
-		"sub": fmt.Sprintf("mailto:%s", subscriber),
+		"sub": subscriber,
 	})
 
 	// Decode the VAPID private key
