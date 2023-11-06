@@ -6,7 +6,7 @@ Replace the public VAPID key in index.html.
 
 Use a tool such as SimpleHTTPServer to run a web server:
 
-```
+```bash
 python3 -m http.server 8000
 ```
 
