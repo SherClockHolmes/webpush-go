@@ -5,6 +5,8 @@
   <title>Webpush Golang Example</title>
 </head>
 <body>
+  <p>PWA Test</p>
+  <p id="output"></p>
   <script>
     function subscribe() {
       navigator.serviceWorker.ready
@@ -18,8 +20,12 @@
         })
         .then(function(subscription) {
           console.log("Subscription:\n", JSON.stringify(subscription));
+          document.getElementById("output").innerHTML = JSON.stringify(subscription);
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+          console.error(err);
+          document.getElementById("output").innerHTML = `error: ${err}`;
+        });
     }
 
     function urlBase64ToUint8Array(base64String) {
@@ -32,18 +38,24 @@
     }
 
     if ('serviceWorker' in navigator) {
+      document.getElementById("output").innerHTML = "registering service worker...";
       navigator.serviceWorker.register('service-worker.js');
       navigator.serviceWorker.ready
         .then(function(registration) {
+          document.getElementById("output").innerHTML = "fetching subscriptions...";
           return registration.pushManager.getSubscription();
         })
         .then(function(subscription) {
           if (!subscription) {
+            document.getElementById("output").innerHTML = "creating subscription";
             subscribe();
           } else {
             console.log("Subscription:\n", JSON.stringify(subscription));
+            document.getElementById("output").innerHTML = JSON.stringify(subscription);
           }
         });
+    } else {
+      document.getElementById("output").innerHTML = "error: no serviceWorker support? Verify that you're using localhost or HTTPS.";
     }
   </script>
 </body>
