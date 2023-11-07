@@ -13,7 +13,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -193,74 +192,6 @@ func decodeECDSAPublicKey(bytes []byte) (*ecdsa.PublicKey, error) {
 		return nil, fmt.Errorf("converting public VAPID key from *ecdh.PublicKey to *ecdsa.PublicKey: %w", err)
 	}
 	return res, nil
-}
-
-func ecdhPublicKeyToECDSA(key *ecdh.PublicKey) (*ecdsa.PublicKey, error) {
-	// see https://github.com/golang/go/issues/63963
-	rawKey := key.Bytes()
-	switch key.Curve() {
-	case ecdh.P256():
-		return &ecdsa.PublicKey{
-			Curve: elliptic.P256(),
-			X:     big.NewInt(0).SetBytes(rawKey[1:33]),
-			Y:     big.NewInt(0).SetBytes(rawKey[33:]),
-		}, nil
-	case ecdh.P384():
-		return &ecdsa.PublicKey{
-			Curve: elliptic.P384(),
-			X:     big.NewInt(0).SetBytes(rawKey[1:49]),
-			Y:     big.NewInt(0).SetBytes(rawKey[49:]),
-		}, nil
-	case ecdh.P521():
-		return &ecdsa.PublicKey{
-			Curve: elliptic.P521(),
-			X:     big.NewInt(0).SetBytes(rawKey[1:67]),
-			Y:     big.NewInt(0).SetBytes(rawKey[67:]),
-		}, nil
-	default:
-		return nil, fmt.Errorf("cannot convert non-NIST *ecdh.PublicKey to *ecdsa.PublicKey")
-	}
-}
-
-func Test_ecdhPublicKeyToECDSA(t *testing.T) {
-	tests := [...]struct {
-		name  string
-		curve elliptic.Curve
-	}{
-		// P224 not supported by ecdh
-		{
-			name:  "P256",
-			curve: elliptic.P256(),
-		},
-		{
-			name:  "P256",
-			curve: elliptic.P384(),
-		},
-		{
-			name:  "P521",
-			curve: elliptic.P521(),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pk, err := ecdsa.GenerateKey(tt.curve, rand.Reader)
-			if err != nil {
-				t.Fatalf("generating ecdsa.PrivateKey: %s", err)
-			}
-			original := &pk.PublicKey
-			converted, err := original.ECDH()
-			if err != nil {
-				t.Fatalf("converting ecdsa.PublicKey to ecdh.PublicKey: %s", err)
-			}
-			roundtrip, err := ecdhPublicKeyToECDSA(converted)
-			if err != nil {
-				t.Fatalf("converting ecdh.PublicKey back to ecdsa.PublicKey: %s", err)
-			}
-			if !roundtrip.Equal(original) {
-				t.Errorf("Roundtrip changed key from %v to %v", original, roundtrip)
-			}
-		})
-	}
 }
 
 func parseVapidAuthHeader(authHeader string, applicationServerKey *ecdsa.PublicKey) (*jwt.Token, error) {
@@ -448,7 +379,10 @@ func Test_decodeVAPIDPublicKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding private key: %s", err)
 	}
-	privKey := generateVAPIDHeaderKeys(privKeyBytes)
+	privKey, err := generateVAPIDHeaderKeys(privKeyBytes)
+	if err != nil {
+		t.Fatalf("converting private key: %s", err)
+	}
 	wantPubKey := &privKey.PublicKey
 
 	// now decode using our test helper and compare the results

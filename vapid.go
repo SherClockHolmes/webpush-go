@@ -1,6 +1,7 @@
 package webpush
 
 import (
+	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -16,46 +17,69 @@ import (
 // GenerateVAPIDKeys will create a private and public VAPID key pair
 func GenerateVAPIDKeys() (privateKey, publicKey string, err error) {
 	// Get the private key from the P256 curve
-	curve := elliptic.P256()
+	curve := ecdh.P256()
 
-	private, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
+	private, err := curve.GenerateKey(rand.Reader)
 	if err != nil {
 		return
 	}
 
-	public := elliptic.Marshal(curve, x, y)
-
 	// Convert to base64
-	publicKey = base64.RawURLEncoding.EncodeToString(public)
-	privateKey = base64.RawURLEncoding.EncodeToString(private)
-
+	publicKey = base64.RawURLEncoding.EncodeToString(private.PublicKey().Bytes())
+	privateKey = base64.RawURLEncoding.EncodeToString(private.Bytes())
 	return
 }
 
 // Generates the ECDSA public and private keys for the JWT encryption
-func generateVAPIDHeaderKeys(privateKey []byte) *ecdsa.PrivateKey {
-	// Public key
-	curve := elliptic.P256()
-	px, py := curve.ScalarMult(
-		curve.Params().Gx,
-		curve.Params().Gy,
-		privateKey,
-	)
-
-	pubKey := ecdsa.PublicKey{
-		Curve: curve,
-		X:     px,
-		Y:     py,
+func generateVAPIDHeaderKeys(privateKey []byte) (*ecdsa.PrivateKey, error) {
+	key, err := ecdh.P256().NewPrivateKey(privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("validating private key: %w", err)
 	}
+	converted, err := ecdhPrivateKeyToECDSA(key)
+	if err != nil {
+		return nil, fmt.Errorf("converting private key to crypto/ecdsa: %w", err)
+	}
+	return converted, nil
+}
 
-	// Private key
-	d := &big.Int{}
-	d.SetBytes(privateKey)
+func ecdhPublicKeyToECDSA(key *ecdh.PublicKey) (*ecdsa.PublicKey, error) {
+	// see https://github.com/golang/go/issues/63963
+	rawKey := key.Bytes()
+	switch key.Curve() {
+	case ecdh.P256():
+		return &ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+			X:     big.NewInt(0).SetBytes(rawKey[1:33]),
+			Y:     big.NewInt(0).SetBytes(rawKey[33:]),
+		}, nil
+	case ecdh.P384():
+		return &ecdsa.PublicKey{
+			Curve: elliptic.P384(),
+			X:     big.NewInt(0).SetBytes(rawKey[1:49]),
+			Y:     big.NewInt(0).SetBytes(rawKey[49:]),
+		}, nil
+	case ecdh.P521():
+		return &ecdsa.PublicKey{
+			Curve: elliptic.P521(),
+			X:     big.NewInt(0).SetBytes(rawKey[1:67]),
+			Y:     big.NewInt(0).SetBytes(rawKey[67:]),
+		}, nil
+	default:
+		return nil, fmt.Errorf("cannot convert non-NIST *ecdh.PublicKey to *ecdsa.PublicKey")
+	}
+}
 
+func ecdhPrivateKeyToECDSA(key *ecdh.PrivateKey) (*ecdsa.PrivateKey, error) {
+	// see https://github.com/golang/go/issues/63963
+	pubKey, err := ecdhPublicKeyToECDSA(key.PublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("converting PublicKey part of *ecdh.PrivateKey: %w", err)
+	}
 	return &ecdsa.PrivateKey{
-		PublicKey: pubKey,
-		D:         d,
-	}
+		PublicKey: *pubKey,
+		D:         big.NewInt(0).SetBytes(key.Bytes()),
+	}, nil
 }
 
 // getVAPIDAuthorizationHeader
@@ -84,7 +108,10 @@ func getVAPIDAuthorizationHeader(
 		return "", err
 	}
 
-	privKey := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
+	privKey, err := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
+	if err != nil {
+		return "", fmt.Errorf("generating VAPID header keys: %w", err)
+	}
 
 	// Sign token with private key
 	jwtString, err := token.SignedString(privKey)

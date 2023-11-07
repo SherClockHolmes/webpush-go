@@ -5,12 +5,13 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/elliptic"
+	"crypto/ecdh"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -77,53 +78,47 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 	// Authentication secret (auth_secret)
 	authSecret, err := decodeSubscriptionKey(s.Keys.Auth)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding keys.auth: %w", err)
 	}
 
 	// dh (Diffie Hellman)
 	dh, err := decodeSubscriptionKey(s.Keys.P256dh)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding keys.p256dh: %w", err)
+	}
+	userAgentPublicKey, err := ecdh.P256().NewPublicKey(dh)
+	if err != nil {
+		return nil, fmt.Errorf("validating keys.p256dh: %w", err)
 	}
 
 	// Generate 16 byte salt
 	salt, err := saltFunc()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generating salt: %w", err)
 	}
 
 	// Create the ecdh_secret shared key pair
-	curve := elliptic.P256()
 
 	// Application server key pairs (single use)
-	localPrivateKey, x, y, err := elliptic.GenerateKey(curve, rand.Reader)
+	localPrivateKey, err := ecdh.P256().GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, err
 	}
 
-	localPublicKey := elliptic.Marshal(curve, x, y)
+	localPublicKey := localPrivateKey.PublicKey()
 
-	// Combine application keys with receiver's EC public key
-	sharedX, sharedY := elliptic.Unmarshal(curve, dh)
-	if sharedX == nil {
-		return nil, errors.New("Unmarshal Error: Public key is not a valid point on the curve")
+	// Combine application keys with receiver's EC public key to derive ECDH shared secret
+	sharedECDHSecret, err := localPrivateKey.ECDH(userAgentPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("deriving shared secret: %w", err)
 	}
-
-	// Derive ECDH shared secret
-	sx, sy := curve.ScalarMult(sharedX, sharedY, localPrivateKey)
-	if !curve.IsOnCurve(sx, sy) {
-		return nil, errors.New("Encryption error: ECDH shared secret isn't on curve")
-	}
-	mlen := curve.Params().BitSize / 8
-	sharedECDHSecret := make([]byte, mlen)
-	sx.FillBytes(sharedECDHSecret)
 
 	hash := sha256.New
 
 	// ikm
 	prkInfoBuf := bytes.NewBuffer([]byte("WebPush: info\x00"))
 	prkInfoBuf.Write(dh)
-	prkInfoBuf.Write(localPublicKey)
+	prkInfoBuf.Write(localPublicKey.Bytes())
 
 	prkHKDF := hkdf.New(hash, sharedECDHSecret, authSecret, prkInfoBuf.Bytes())
 	ikm, err := getHKDFKey(prkHKDF, 32)
@@ -173,8 +168,8 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 	binary.BigEndian.PutUint32(rs, recordSize)
 
 	recordBuf.Write(rs)
-	recordBuf.Write([]byte{byte(len(localPublicKey))})
-	recordBuf.Write(localPublicKey)
+	recordBuf.Write([]byte{byte(len(localPublicKey.Bytes()))})
+	recordBuf.Write(localPublicKey.Bytes())
 
 	// Data
 	dataBuf := bytes.NewBuffer(message)
