@@ -33,6 +33,10 @@ func getStandardEncodedTestSubscription() *Subscription {
 }
 
 func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
+	priv, pub, err := GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
 	resp, err := SendNotification([]byte("Test"), getURLEncodedTestSubscription(), &Options{
 		HTTPClient:      &testHTTPClient{},
 		RecordSize:      3070,
@@ -40,8 +44,8 @@ func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
 		Topic:           "test_topic",
 		TTL:             0,
 		Urgency:         "low",
-		VAPIDPublicKey:  "test-public",
-		VAPIDPrivateKey: "test-private",
+		VAPIDPublicKey:  pub,
+		VAPIDPrivateKey: priv,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +53,7 @@ func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
 
 	if resp.StatusCode != 201 {
 		t.Fatalf(
-			"Incorreect status code, expected=%d, got=%d",
+			"Incorrect status code, expected=%d, got=%d",
 			resp.StatusCode,
 			201,
 		)
@@ -57,13 +61,17 @@ func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
 }
 
 func TestSendNotificationToStandardEncodedSubscription(t *testing.T) {
+	priv, _, err := GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
 	resp, err := SendNotification([]byte("Test"), getStandardEncodedTestSubscription(), &Options{
 		HTTPClient:      &testHTTPClient{},
 		Subscriber:      "<EMAIL@EXAMPLE.COM>",
 		Topic:           "test_topic",
 		TTL:             0,
 		Urgency:         "low",
-		VAPIDPrivateKey: "testKey",
+		VAPIDPrivateKey: priv,
 	})
 	if err != nil {
 		t.Fatal(err)

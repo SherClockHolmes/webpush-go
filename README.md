@@ -54,7 +54,7 @@ if err != nil {
 
 ## Development
 
-1. Install [Go 1.11+](https://golang.org/)
+1. Install [Go 1.20+](https://golang.org/)
 2. `go mod vendor`
 3. `go test`
 

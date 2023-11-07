@@ -1,6 +1,9 @@
 package webpush
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"strings"
@@ -44,10 +47,13 @@ func TestVAPID(t *testing.T) {
 		b64 := base64.RawURLEncoding
 		decodedVapidPrivateKey, err := b64.DecodeString(vapidPrivateKey)
 		if err != nil {
-			t.Fatal("Could not decode VAPID private key")
+			t.Fatalf("Could not decode VAPID private key: %s", err)
 		}
 
-		privKey := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
+		privKey, err := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
+		if err != nil {
+			t.Fatalf("Could not parse VAPID private key: %s", err)
+		}
 		return privKey.Public(), nil
 	})
 
@@ -99,4 +105,85 @@ func getTokenFromAuthorizationHeader(tokenHeader string, t *testing.T) string {
 	}
 
 	return tsplit[1][:len(tsplit[1])-1]
+}
+
+func Test_ecdhPublicKeyToECDSA(t *testing.T) {
+	tests := [...]struct {
+		name  string
+		curve elliptic.Curve
+	}{
+		// P224 not supported by ecdh
+		{
+			name:  "P256",
+			curve: elliptic.P256(),
+		},
+		{
+			name:  "P256",
+			curve: elliptic.P384(),
+		},
+		{
+			name:  "P521",
+			curve: elliptic.P521(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pk, err := ecdsa.GenerateKey(tt.curve, rand.Reader)
+			if err != nil {
+				t.Fatalf("generating ecdsa.PrivateKey: %s", err)
+			}
+			original := &pk.PublicKey
+			converted, err := original.ECDH()
+			if err != nil {
+				t.Fatalf("converting ecdsa.PublicKey to ecdh.PublicKey: %s", err)
+			}
+			roundtrip, err := ecdhPublicKeyToECDSA(converted)
+			if err != nil {
+				t.Fatalf("converting ecdh.PublicKey back to ecdsa.PublicKey: %s", err)
+			}
+			if !roundtrip.Equal(original) {
+				t.Errorf("Roundtrip changed key from %v to %v", original, roundtrip)
+			}
+		})
+	}
+}
+
+func Test_ecdhPrivateKeyToECDSA(t *testing.T) {
+	tests := [...]struct {
+		name  string
+		curve elliptic.Curve
+	}{
+		// P224 not supported by ecdh
+		{
+			name:  "P256",
+			curve: elliptic.P256(),
+		},
+		{
+			name:  "P256",
+			curve: elliptic.P384(),
+		},
+		{
+			name:  "P521",
+			curve: elliptic.P521(),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			original, err := ecdsa.GenerateKey(tt.curve, rand.Reader)
+			if err != nil {
+				t.Fatalf("generating ecdsa.PrivateKey: %s", err)
+			}
+			converted, err := original.ECDH()
+			if err != nil {
+				t.Fatalf("converting ecdsa.PrivateKey to ecdh.PrivateKey: %s", err)
+			}
+			roundtrip, err := ecdhPrivateKeyToECDSA(converted)
+			if err != nil {
+				t.Fatalf("converting ecdh.PrivateKey back to ecdsa.PrivateKey: %s", err)
+			}
+			if !roundtrip.Equal(original) {
+				t.Errorf("Roundtrip changed key from %v to %v", original, roundtrip)
+			}
+		})
+	}
 }
