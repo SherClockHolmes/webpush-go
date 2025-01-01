@@ -7,7 +7,7 @@ Replace the public VAPID key in index.html.
 Use a tool such as SimpleHTTPServer to run a web server:
 
 ```
-python -m SimpleHTTPServer 8000
+python3 -m http.server 8000
 ```
 
 Go to `http://localhost:8000` and copy the logged subsciption from the console.

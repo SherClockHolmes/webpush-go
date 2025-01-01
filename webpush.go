@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/hkdf"
 )
@@ -49,6 +50,7 @@ type Options struct {
 	Urgency         Urgency    // Set the Urgency header to change a message priority (Optional)
 	VAPIDPublicKey  string     // VAPID public key, passed in VAPID Authorization header
 	VAPIDPrivateKey string     // VAPID private key, used to sign VAPID JWT token
+	VapidExpiration time.Time  // optional expiration for VAPID JWT token (defaults to now + 12 hours)
 }
 
 // Keys are the base64 encoded values from PushSubscription.getKey()
@@ -101,14 +103,20 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 
 	localPublicKey := elliptic.Marshal(curve, x, y)
 
-	// Combine application keys with dh
+	// Combine application keys with receiver's EC public key
 	sharedX, sharedY := elliptic.Unmarshal(curve, dh)
 	if sharedX == nil {
 		return nil, errors.New("Unmarshal Error: Public key is not a valid point on the curve")
 	}
 
-	sx, _ := curve.ScalarMult(sharedX, sharedY, localPrivateKey)
-	sharedECDHSecret := sx.Bytes()
+	// Derive ECDH shared secret
+	sx, sy := curve.ScalarMult(sharedX, sharedY, localPrivateKey)
+	if !curve.IsOnCurve(sx, sy) {
+		return nil, errors.New("Encryption error: ECDH shared secret isn't on curve")
+	}
+	mlen := curve.Params().BitSize / 8
+	sharedECDHSecret := make([]byte, mlen)
+	sx.FillBytes(sharedECDHSecret)
 
 	hash := sha256.New
 
@@ -206,12 +214,18 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 		req.Header.Set("Urgency", string(options.Urgency))
 	}
 
+	expiration := options.VapidExpiration
+	if expiration.IsZero() {
+		expiration = time.Now().Add(time.Hour * 12)
+	}
+
 	// Get VAPID Authorization header
 	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
 		s.Endpoint,
 		options.Subscriber,
 		options.VAPIDPublicKey,
 		options.VAPIDPrivateKey,
+		expiration,
 	)
 	if err != nil {
 		return nil, err
