@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 )
@@ -15,7 +16,12 @@ const (
 func main() {
 	// Decode subscription
 	s := &webpush.Subscription{}
-	json.Unmarshal([]byte(subscription), s)
+	if err := json.Unmarshal([]byte(subscription), s); err != nil {
+		log.Fatalf("unmarshaling subscription: %s", err)
+	}
+	if s.Endpoint == "" {
+		log.Fatalf("subscription contains no endpoint field")
+	}
 
 	// Send Notification
 	resp, err := webpush.SendNotification([]byte("Test"), s, &webpush.Options{
@@ -25,7 +31,7 @@ func main() {
 		TTL:             30,
 	})
 	if err != nil {
-		// TODO: Handle error
+		log.Fatalf("sending notification: %s", err)
 	}
 	defer resp.Body.Close()
 }
