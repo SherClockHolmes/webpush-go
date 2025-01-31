@@ -20,13 +20,16 @@ func TestVAPID(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Unusual expiration to check that the expiration value is used
+	expiration := time.Now().Add(time.Hour * 11).Add(23 * time.Minute)
+
 	// Get authentication header
 	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
 		s.Endpoint,
 		sub,
 		vapidPublicKey,
 		vapidPrivateKey,
-		time.Now().Add(time.Hour*12),
+		expiration,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -64,6 +67,15 @@ func TestVAPID(t *testing.T) {
 
 		if claims["aud"] == "" {
 			t.Fatal("Audience should not be empty")
+		}
+
+		expectedExp := float64(expiration.Unix())
+		if expectedExp != claims["exp"] {
+			t.Fatalf(
+				"Incorrect exp, expected=%v, got=%v",
+				expectedExp,
+				claims["exp"],
+			)
 		}
 	} else {
 		t.Fatal(err)

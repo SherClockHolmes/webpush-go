@@ -79,7 +79,7 @@ func getVAPIDAuthorizationHeader(
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"aud": subURL.Scheme + "://" + subURL.Host,
-		"exp": time.Now().Add(time.Hour * 12).Unix(),
+		"exp": expiration.Unix(),
 		"sub": subscriber,
 	})
 
