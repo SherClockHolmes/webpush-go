@@ -176,9 +176,11 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 	recordBuf.Write([]byte{byte(len(localPublicKey))})
 	recordBuf.Write(localPublicKey)
 
-	// Data
-	dataBuf := bytes.NewBuffer(message)
-
+	// Avoid data races by copying the message data
+	messageCopy := make([]byte, len(message))
+	copy(messageCopy, message)
+	dataBuf := bytes.NewBuffer(messageCopy)
+	
 	// Pad content to max record size - 16 - header
 	// Padding ending delimeter
 	dataBuf.Write([]byte("\x02"))
