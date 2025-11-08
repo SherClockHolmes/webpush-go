@@ -4,24 +4,32 @@
   <meta charset="utf-8">
   <title>Webpush Golang Example</title>
 </head>
-<body>
+  <body style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh;">
+  <button id="send-notification-btn" disabled style="padding: 10px; font-size: 16px;">
+    Send Test Notification
+  </button>
+
   <script>
+    const sendNotificationBtn = document.getElementById('send-notification-btn');
+    let currentSubscription;
+
     function subscribe() {
+      console.log('Subscribing to push notifications...');
       navigator.serviceWorker.ready
         .then(function(registration) {
-          const vapidPublicKey = '<YOUR_VAPID_PUBLIC_KEY>';
-
-          return registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-          });
+          console.log('Fetching VAPID public key...');
+          return fetch('/vapid_public_key').then(response => response.text()).then(vapidPublicKey => {
+            console.log('Got VAPID public key.');
+            return registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+            });
+          })
         })
         .then(function(subscription) {
-          console.log(
-            JSON.stringify({
-              subscription: subscription,
-            })
-          );
+          currentSubscription = subscription;
+          console.log('Subscription registered.');
+          sendNotificationBtn.disabled = false;
         })
         .catch(err => console.error(err));
     }
@@ -36,23 +44,45 @@
     }
 
     if ('serviceWorker' in navigator) {
+      console.log('Registering service worker...');
       navigator.serviceWorker.register('service-worker.js');
       navigator.serviceWorker.ready
         .then(function(registration) {
+          console.log('Service worker ready, checking for subscription...');
           return registration.pushManager.getSubscription();
         })
         .then(function(subscription) {
           if (!subscription) {
+            console.log('No subscription found, starting subscription process.');
             subscribe();
           } else {
-            console.log(
-              JSON.stringify({
-                subscription: subscription,
-              })
-            );
+            console.log('Existing subscription found.');
+            currentSubscription = subscription;
+            sendNotificationBtn.disabled = false;
           }
         });
     }
+
+    sendNotificationBtn.addEventListener('click', () => {
+      console.log('Sending notification...');
+
+      let authScheme = 'vapid';
+      const userAgent = navigator.userAgent;
+      if (userAgent.indexOf("Chrome") > -1 && userAgent.indexOf("Edg") === -1) {
+          authScheme = 'webpush';
+      }
+
+      fetch('/send_notification', {
+        method: 'POST',
+        body: JSON.stringify({
+          subscription: currentSubscription,
+          authScheme: authScheme,
+        })
+      })
+      .then(response => response.text())
+      .then(text => console.log('Server response:', text))
+      .catch(err => console.error('Error sending notification:', err));
+    });
   </script>
 </body>
 </html>

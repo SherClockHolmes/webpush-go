@@ -1,4 +1,5 @@
 vendor/**
+vapid_keys.json
 
 .DS_Store
 *.out

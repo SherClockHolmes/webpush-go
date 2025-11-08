@@ -41,6 +41,24 @@ func main() {
 }
 ```
 
+### Auth Scheme
+
+Due to inconsistencies in how different browsers have implemented the Web Push protocol, it is necessary to specify which VAPID authentication scheme to use.
+
+*   `vapid`: The original scheme, used by Firefox and other browsers.
+*   `webpush`: The modern scheme, used by Chrome.
+
+You can specify the scheme in the `Options` struct:
+
+```go
+&webpush.Options{
+    AuthScheme: webpush.WebPush,
+    // ... other options
+}
+```
+
+If no `AuthScheme` is specified, it will default to `vapid`.
+
 ### Generating VAPID Keys
 
 Use the helper method `GenerateVAPIDKeys` to generate the VAPID key pair.
