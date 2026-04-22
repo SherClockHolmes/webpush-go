@@ -13,6 +13,17 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// AuthScheme is the type for VAPID authentication schemes.
+type AuthScheme string
+
+const (
+	// Vapid is the original VAPID scheme.
+	Vapid AuthScheme = "vapid"
+	// WebPush is the modern VAPID scheme.
+	WebPush AuthScheme = "webpush"
+)
+
+
 // GenerateVAPIDKeys will create a private and public VAPID key pair
 func GenerateVAPIDKeys() (privateKey, publicKey string, err error) {
 	// Get the private key from the P256 curve
@@ -58,18 +69,20 @@ func generateVAPIDHeaderKeys(privateKey []byte) *ecdsa.PrivateKey {
 	}
 }
 
-// getVAPIDAuthorizationHeader
-func getVAPIDAuthorizationHeader(
+// generateVAPIDHeaders generates the VAPID headers.
+// It returns a map of headers.
+func generateVAPIDHeaders(
 	endpoint,
 	subscriber,
 	vapidPublicKey,
 	vapidPrivateKey string,
 	expiration time.Time,
-) (string, error) {
+	authScheme AuthScheme,
+) (map[string]string, error) {
 	// Create the JWT token
 	subURL, err := url.Parse(endpoint)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	// Unless subscriber is an HTTPS URL, assume an e-mail address
@@ -86,7 +99,7 @@ func getVAPIDAuthorizationHeader(
 	// Decode the VAPID private key
 	decodedVapidPrivateKey, err := decodeVapidKey(vapidPrivateKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	privKey := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
@@ -94,16 +107,24 @@ func getVAPIDAuthorizationHeader(
 	// Sign token with private key
 	jwtString, err := token.SignedString(privKey)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// Decode the VAPID public key
-	pubKey, err := decodeVapidKey(vapidPublicKey)
-	if err != nil {
-		return "", err
+	headers := make(map[string]string)
+
+	switch authScheme {
+	case WebPush:
+		headers["Authorization"] = "WebPush " + jwtString
+		headers["Crypto-Key"] = "p256ecdsa=" + vapidPublicKey
+	default: // Default to the old scheme
+		pubKey, err := decodeVapidKey(vapidPublicKey)
+		if err != nil {
+			return nil, err
+		}
+		headers["Authorization"] = "vapid t=" + jwtString + ", k=" + base64.RawURLEncoding.EncodeToString(pubKey)
 	}
 
-	return "vapid t=" + jwtString + ", k=" + base64.RawURLEncoding.EncodeToString(pubKey), nil
+	return headers, nil
 }
 
 // Need to decode the vapid private key in multiple base64 formats

@@ -42,6 +42,7 @@ type HTTPClient interface {
 
 // Options are config and extra params needed to send a notification
 type Options struct {
+	AuthScheme      AuthScheme // VAPID authentication scheme, defaults to "vapid"
 	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
 	RecordSize      uint32     // Limit the record size
 	Subscriber      string     // Sub in VAPID JWT token
@@ -220,19 +221,22 @@ func SendNotificationWithContext(ctx context.Context, message []byte, s *Subscri
 		expiration = time.Now().Add(time.Hour * 12)
 	}
 
-	// Get VAPID Authorization header
-	vapidAuthHeader, err := getVAPIDAuthorizationHeader(
+	// Get VAPID headers
+	vapidHeaders, err := generateVAPIDHeaders(
 		s.Endpoint,
 		options.Subscriber,
 		options.VAPIDPublicKey,
 		options.VAPIDPrivateKey,
 		expiration,
+		options.AuthScheme,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", vapidAuthHeader)
+	for key, value := range vapidHeaders {
+		req.Header.Set(key, value)
+	}
 
 	// Send the request
 	var client HTTPClient

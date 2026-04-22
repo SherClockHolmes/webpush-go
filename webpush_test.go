@@ -33,61 +33,93 @@ func getStandardEncodedTestSubscription() *Subscription {
 }
 
 func TestSendNotificationToURLEncodedSubscription(t *testing.T) {
-	resp, err := SendNotification([]byte("Test"), getURLEncodedTestSubscription(), &Options{
-		HTTPClient:      &testHTTPClient{},
-		RecordSize:      3070,
-		Subscriber:      "<EMAIL@EXAMPLE.COM>",
-		Topic:           "test_topic",
-		TTL:             0,
-		Urgency:         "low",
-		VAPIDPublicKey:  "test-public",
-		VAPIDPrivateKey: "test-private",
-	})
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		authScheme AuthScheme
+	}{
+		{Vapid},
+		{WebPush},
 	}
 
-	if resp.StatusCode != 201 {
-		t.Fatalf(
-			"Incorreect status code, expected=%d, got=%d",
-			resp.StatusCode,
-			201,
-		)
+	for _, test := range tests {
+		resp, err := SendNotification([]byte("Test"), getURLEncodedTestSubscription(), &Options{
+			HTTPClient:      &testHTTPClient{},
+			RecordSize:      3070,
+			Subscriber:      "<EMAIL@EXAMPLE.COM>",
+			Topic:           "test_topic",
+			TTL:             0,
+			Urgency:         "low",
+			VAPIDPublicKey:  "test-public",
+			VAPIDPrivateKey: "test-private",
+			AuthScheme:      test.authScheme,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.StatusCode != 201 {
+			t.Fatalf(
+				"Incorreect status code, expected=%d, got=%d",
+				resp.StatusCode,
+				201,
+			)
+		}
 	}
 }
 
 func TestSendNotificationToStandardEncodedSubscription(t *testing.T) {
-	resp, err := SendNotification([]byte("Test"), getStandardEncodedTestSubscription(), &Options{
-		HTTPClient:      &testHTTPClient{},
-		Subscriber:      "<EMAIL@EXAMPLE.COM>",
-		Topic:           "test_topic",
-		TTL:             0,
-		Urgency:         "low",
-		VAPIDPrivateKey: "testKey",
-	})
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		authScheme AuthScheme
+	}{
+		{Vapid},
+		{WebPush},
 	}
 
-	if resp.StatusCode != 201 {
-		t.Fatalf(
-			"Incorreect status code, expected=%d, got=%d",
-			resp.StatusCode,
-			201,
-		)
+	for _, test := range tests {
+		resp, err := SendNotification([]byte("Test"), getStandardEncodedTestSubscription(), &Options{
+			HTTPClient:      &testHTTPClient{},
+			Subscriber:      "<EMAIL@EXAMPLE.COM>",
+			Topic:           "test_topic",
+			TTL:             0,
+			Urgency:         "low",
+			VAPIDPublicKey:  "test-public",
+			VAPIDPrivateKey: "testKey",
+			AuthScheme:      test.authScheme,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if resp.StatusCode != 201 {
+			t.Fatalf(
+				"Incorreect status code, expected=%d, got=%d",
+				resp.StatusCode,
+				201,
+			)
+		}
 	}
 }
 
 func TestSendTooLargeNotification(t *testing.T) {
-	_, err := SendNotification([]byte(strings.Repeat("Test", int(MaxRecordSize))), getStandardEncodedTestSubscription(), &Options{
-		HTTPClient:      &testHTTPClient{},
-		Subscriber:      "<EMAIL@EXAMPLE.COM>",
-		Topic:           "test_topic",
-		TTL:             0,
-		Urgency:         "low",
-		VAPIDPrivateKey: "testKey",
-	})
-	if err == nil {
-		t.Fatalf("Error is nil, expected=%s", ErrMaxPadExceeded)
+	tests := []struct {
+		authScheme AuthScheme
+	}{
+		{Vapid},
+		{WebPush},
+	}
+
+	for _, test := range tests {
+		_, err := SendNotification([]byte(strings.Repeat("Test", int(MaxRecordSize))), getStandardEncodedTestSubscription(), &Options{
+			HTTPClient:      &testHTTPClient{},
+			Subscriber:      "<EMAIL@EXAMPLE.COM>",
+			Topic:           "test_topic",
+			TTL:             0,
+			Urgency:         "low",
+			VAPIDPublicKey:  "test-public",
+			VAPIDPrivateKey: "testKey",
+			AuthScheme:      test.authScheme,
+		})
+		if err == nil {
+			t.Fatalf("Error is nil, expected=%s", ErrMaxPadExceeded)
+		}
 	}
 }
