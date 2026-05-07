@@ -108,6 +108,58 @@ func TestVAPID(t *testing.T) {
 	}
 }
 
+func TestVAPIDSubscriberFormats(t *testing.T) {
+	s := getStandardEncodedTestSubscription()
+	vapidPrivateKey, vapidPublicKey, err := GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"bare email", "test@test.com", "mailto:test@test.com"},
+		{"mailto URI", "mailto:test@test.com", "mailto:test@test.com"},
+		{"https URI", "https://example.com/contact", "https://example.com/contact"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vapidHeaders, err := generateVAPIDHeaders(
+				s.Endpoint,
+				tt.input,
+				vapidPublicKey,
+				vapidPrivateKey,
+				time.Now().Add(time.Hour),
+				Vapid,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tokenString := getTokenFromAuthorizationHeader(vapidHeaders["Authorization"], Vapid, t)
+			token, _ := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+				b64 := base64.RawURLEncoding
+				decodedVapidPrivateKey, err := b64.DecodeString(vapidPrivateKey)
+				if err != nil {
+					return nil, err
+				}
+				return generateVAPIDHeaderKeys(decodedVapidPrivateKey).Public(), nil
+			})
+
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok || !token.Valid {
+				t.Fatal("invalid token")
+			}
+			if claims["sub"] != tt.expected {
+				t.Fatalf("sub: expected=%q got=%q", tt.expected, claims["sub"])
+			}
+		})
+	}
+}
+
 func TestVAPIDKeys(t *testing.T) {
 	privateKey, publicKey, err := GenerateVAPIDKeys()
 	if err != nil {
