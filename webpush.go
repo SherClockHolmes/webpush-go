@@ -45,7 +45,7 @@ type Options struct {
 	AuthScheme      AuthScheme // VAPID authentication scheme, defaults to "vapid"
 	HTTPClient      HTTPClient // Will replace with *http.Client by default if not included
 	RecordSize      uint32     // Limit the record size
-	Subscriber      string     // Sub in VAPID JWT token
+	Subscriber      string     // Sub in VAPID JWT token. Accepts a "mailto:" or "https:" URI; a bare value is treated as an e-mail and prefixed with "mailto:".
 	Topic           string     // Set the Topic header to collapse a pending messages (Optional)
 	TTL             int        // Set the TTL on the endpoint POST request
 	Urgency         Urgency    // Set the Urgency header to change a message priority (Optional)
