@@ -85,8 +85,9 @@ func generateVAPIDHeaders(
 		return nil, err
 	}
 
-	// Unless subscriber is an HTTPS URL, assume an e-mail address
-	if !strings.HasPrefix(subscriber, "https:") {
+	// Unless subscriber is already a URL (mailto or https), assume an
+	// e-mail address
+	if !strings.HasPrefix(subscriber, "https:") && !strings.HasPrefix(subscriber, "mailto:") {
 		subscriber = "mailto:" + subscriber
 	}
 

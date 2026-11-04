@@ -151,3 +151,48 @@ func getTokenFromAuthorizationHeader(tokenHeader string, authScheme AuthScheme, 
 		return tsplit[1][:len(tsplit[1])-1]
 	}
 }
+
+// A subscriber already in RFC 8292 form ("mailto:..." or "https://...")
+// must be used as-is, not double-prefixed.
+func TestVAPIDSubscriberAlreadyPrefixed(t *testing.T) {
+	s := getStandardEncodedTestSubscription()
+	vapidPrivateKey, vapidPublicKey, err := GenerateVAPIDKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, sub := range []string{"mailto:test@test.com", "https://example.com/contact"} {
+		vapidHeaders, err := generateVAPIDHeaders(
+			s.Endpoint,
+			sub,
+			vapidPublicKey,
+			vapidPrivateKey,
+			time.Now().Add(time.Hour),
+			Vapid,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tokenString := getTokenFromAuthorizationHeader(vapidHeaders["Authorization"], Vapid, t)
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			b64 := base64.RawURLEncoding
+			decodedVapidPrivateKey, err := b64.DecodeString(vapidPrivateKey)
+			if err != nil {
+				t.Fatal("Could not decode Vapid private key")
+			}
+			privKey := generateVAPIDHeaderKeys(decodedVapidPrivateKey)
+			return privKey.Public(), nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok || !token.Valid {
+			t.Fatal("invalid token")
+		}
+		if claims["sub"] != sub {
+			t.Fatalf("subscriber already in RFC 8292 form must not be modified: expected=%s, got=%s", sub, claims["sub"])
+		}
+	}
+}
