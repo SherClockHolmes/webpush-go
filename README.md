@@ -43,10 +43,11 @@ func main() {
 
 ### Auth Scheme
 
-Due to inconsistencies in how different browsers have implemented the Web Push protocol, it is necessary to specify which VAPID authentication scheme to use.
+If you need to support the legacy authentication scheme, for example for retro-compatibility with a browser from 2016, you can specify the VAPID authentication scheme to use.
+Note that using the legacy scheme may break push notifications on recent applications.
 
-*   `vapid`: The original scheme, used by Firefox and other browsers.
-*   `webpush`: The modern scheme, used by Chrome.
+*   `vapid`: The standard and recommended scheme, used by Firefox, Chrome and all browsers.
+*   `webpush`: The legacy scheme, from a [draft of webpush deprecated in 2016](https://datatracker.ietf.org/doc/draft-ietf-webpush-vapid/01/).
 
 You can specify the scheme in the `Options` struct:
 
